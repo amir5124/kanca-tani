@@ -128,6 +128,60 @@ function calculatePrice(basePrice, distanceKm, pricePerKm, isReturn, discountPer
     };
 }
 
+function isValidEmailFormat(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+app.post('/api/validate-email', async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ valid: false, message: 'Email wajib diisi' });
+  }
+
+  // Filter cepat sebelum hit API eksternal
+  if (!isValidEmailFormat(email)) {
+    return res.json({ valid: false, message: 'Format email tidak valid' });
+  }
+
+  try {
+    const response = await fetch(
+      `https://emailvalidation.abstractapi.com/v1/?api_key=${process.env.ABSTRACT_API_KEY}&email=${encodeURIComponent(email)}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    const isFormatValid = data.is_valid_format?.value;
+    const isDisposable = data.is_disposable_email?.value;
+    const isMxFound = data.is_mx_found?.value;
+    const deliverability = data.deliverability; // DELIVERABLE, UNDELIVERABLE, RISKY, UNKNOWN
+
+    if (!isFormatValid || !isMxFound) {
+      return res.json({ valid: false, message: 'Email tidak valid atau domain tidak ditemukan' });
+    }
+
+    if (isDisposable) {
+      return res.json({ valid: false, message: 'Email sementara/disposable tidak diperbolehkan' });
+    }
+
+    if (deliverability === 'UNDELIVERABLE') {
+      return res.json({ valid: false, message: 'Email tidak dapat menerima pesan' });
+    }
+
+    // RISKY / UNKNOWN bisa kamu izinkan lolos tapi kasih warning, sesuai kebijakanmu
+    return res.json({ valid: true, deliverability });
+
+  } catch (err) {
+    console.error('Email validation error:', err.message);
+    // Fail-open: kalau API down, jangan block user booking
+    return res.json({ valid: true, message: 'Validasi eksternal gagal, dilewati' });
+  }
+});
+
 // ==================== TICKET BOAT HELPER FUNCTIONS ====================
 async function getTicketBoatRoutes() {
     const [routes] = await pool.execute(
