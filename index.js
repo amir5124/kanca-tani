@@ -1207,23 +1207,43 @@ app.get('/api/admin/bookings', authenticateAdmin, async (req, res) => {
 });
 
 // ============ GET BOOKING DETAIL (ADMIN) ============
+// ============ GET BOOKING DETAIL (ADMIN) ============
 app.get('/api/admin/bookings/:id', authenticateAdmin, async (req, res) => {
     const { id } = req.params;
     try {
         const [bookings] = await pool.query(
-            `SELECT b.*, 
-                    c.full_name as customer_name, 
-                    c.whatsapp as customer_phone,
-                    c.email as customer_email, 
-                    u.full_name as admin_name,
-                    tt.name as ticket_type_name,
-                    -- ✅ Format depart datetime dengan jam
-                    CONCAT(DATE_FORMAT(b.tb_depart_date, '%d/%m/%Y'), ' ', TIME_FORMAT(b.tb_depart_time, '%H:%i')) as tb_depart_datetime_formatted,
-                    -- ✅ Format return datetime dengan jam
-                    CONCAT(DATE_FORMAT(b.tb_return_date, '%d/%m/%Y'), ' ', TIME_FORMAT(b.tb_return_time, '%H:%i')) as tb_return_datetime_formatted,
-                    -- Format transfer/fastboat datetime
-                    DATE_FORMAT(b.depart_datetime, '%d/%m/%Y %H:%i') as depart_datetime_formatted,
-                    DATE_FORMAT(b.return_datetime, '%d/%m/%Y %H:%i') as return_datetime_formatted
+            `SELECT 
+                b.*, 
+                c.full_name as customer_name, 
+                c.whatsapp as customer_phone,
+                c.email as customer_email, 
+                u.full_name as admin_name,
+                tt.name as ticket_type_name,
+                
+                -- ============ TICKET BOAT ============
+                -- Format depart datetime dengan jam
+                CONCAT(DATE_FORMAT(b.tb_depart_date, '%d/%m/%Y'), ' ', TIME_FORMAT(b.tb_depart_time, '%H:%i')) as tb_depart_datetime_formatted,
+                -- Format return datetime dengan jam
+                CONCAT(DATE_FORMAT(b.tb_return_date, '%d/%m/%Y'), ' ', TIME_FORMAT(b.tb_return_time, '%H:%i')) as tb_return_datetime_formatted,
+                
+                -- ============ TRANSFER / FASTBOAT ============
+                -- Format datetime untuk transfer dan fastboat (depart)
+                DATE_FORMAT(b.depart_datetime, '%d/%m/%Y %H:%i') as depart_datetime_formatted,
+                -- Format datetime untuk transfer dan fastboat (return)
+                DATE_FORMAT(b.return_datetime, '%d/%m/%Y %H:%i') as return_datetime_formatted,
+                
+                -- ============ FASTBOAT - JAM KEBERANGKATAN & KEPULANGAN ============
+                -- Format jam keberangkatan fastboat (HH:mm)
+                TIME_FORMAT(b.fb_depart_time, '%H:%i') as fb_depart_time_formatted,
+                -- Format jam kepulangan fastboat (HH:mm)
+                TIME_FORMAT(b.fb_return_time, '%H:%i') as fb_return_time_formatted,
+                
+                -- ============ TICKET BOAT - JAM KEBERANGKATAN & KEPULANGAN ============
+                -- Format jam keberangkatan ticket boat (HH:mm)
+                TIME_FORMAT(b.tb_depart_time, '%H:%i') as tb_depart_time_formatted,
+                -- Format jam kepulangan ticket boat (HH:mm)
+                TIME_FORMAT(b.tb_return_time, '%H:%i') as tb_return_time_formatted
+                
             FROM bookings b
             LEFT JOIN booking_customers c ON b.customer_id = c.id
             LEFT JOIN users u ON b.admin_id = u.id
@@ -1231,9 +1251,11 @@ app.get('/api/admin/bookings/:id', authenticateAdmin, async (req, res) => {
             WHERE b.id = ?`,
             [id]
         );
+        
         if (bookings.length === 0) {
             return res.status(404).json({ error: 'Booking not found' });
         }
+        
         res.json(bookings[0]);
     } catch (error) {
         console.error('Get booking detail error:', error);
