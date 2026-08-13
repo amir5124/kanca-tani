@@ -128,14 +128,14 @@ function calculatePrice(basePrice, distanceKm, pricePerKm, isReturn, discountPer
     };
 }
 
-// ==================== VALIDASI EMAIL ====================
+// ==================== VALIDASI EMAIL DENGAN EMAIL REPUTATION API ====================
 
 function isValidEmailFormat(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-// ✅ Gunakan API Key dari environment variable
-// Pastikan di .env: ABSTRACT_API_KEY=28cdc3adf33543cba045088c47a75c9f
+// ✅ Gunakan Email Reputation API (bukan Email Validation API)
+const ABSTRACT_API_URL = 'https://emailreputation.abstractapi.com/v1/';
 
 app.route('/api/validate-email')
   .post(async (req, res) => {
@@ -174,54 +174,25 @@ async function handleEmailValidation(req, res, email) {
     });
   }
 
-  // 3. Cek API Key
-  const apiKey = process.env.ABSTRACT_API_KEY;
-  if (!apiKey || apiKey === 'your_api_key_here' || apiKey.length < 10) {
-    console.warn('⚠️ API Key tidak valid, menggunakan validasi sederhana');
-    // Fallback ke validasi sederhana
-    return res.json({ 
-      valid: true, 
-      message: 'Validasi email dasar (API key tidak tersedia)',
-      warning: true
-    });
-  }
-
-  // 4. Panggil API eksternal AbstractAPI
+  // 3. Panggil Email Reputation API (bukan Email Validation)
+  const apiKey = process.env.ABSTRACT_API_KEY || '28cdc3adf33543cba045088c47a75c9f';
+  
   try {
-    console.log(`🔍 Calling AbstractAPI for: ${email}`);
+    console.log(`🔍 Calling AbstractAPI Email Reputation for: ${email}`);
     console.log(`🔑 API Key: ${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}`);
     
-    const apiUrl = `https://emailvalidation.abstractapi.com/v1/?api_key=${apiKey}&email=${encodeURIComponent(email)}`;
+    const apiUrl = `https://emailreputation.abstractapi.com/v1/?api_key=${apiKey}&email=${encodeURIComponent(email)}`;
+    console.log(`📡 API URL: ${apiUrl.replace(apiKey, 'HIDDEN')}`);
     
     const response = await fetch(apiUrl, {
-      timeout: 10000 // 10 detik timeout
+      timeout: 10000
     });
 
     console.log(`📡 AbstractAPI Response Status: ${response.status}`);
 
-    // Handle berbagai status code
-    if (response.status === 401) {
-      console.error('❌ AbstractAPI 401: Invalid API Key');
-      return res.json({ 
-        valid: false, 
-        message: 'Validasi email gagal (API key invalid)',
-        error: 'invalid_api_key'
-      });
-    }
-
-    if (response.status === 429) {
-      console.warn('⚠️ AbstractAPI Rate Limit Exceeded');
-      return res.json({ 
-        valid: true, 
-        message: 'Validasi email melewati limit, silahkan coba lagi nanti',
-        warning: true,
-        rateLimit: true
-      });
-    }
-
     if (!response.ok) {
       console.error(`❌ AbstractAPI error: ${response.status}`);
-      // Fail-open untuk error selain 401/429
+      // Fail-open: kalau API error, jangan block user
       return res.json({ 
         valid: true, 
         message: 'Validasi eksternal gagal, dilewati',
@@ -232,55 +203,77 @@ async function handleEmailValidation(req, res, email) {
     const data = await response.json();
     console.log(`✅ AbstractAPI Response received`);
     console.log(`📊 Results:`, {
-      formatValid: data.is_valid_format?.value,
-      isDisposable: data.is_disposable_email?.value,
-      isMxFound: data.is_mx_found?.value,
-      deliverability: data.deliverability,
-      qualityScore: data.quality_score
+      deliverability: data.email_deliverability?.status,
+      isFormatValid: data.email_deliverability?.is_format_valid,
+      isSmtpValid: data.email_deliverability?.is_smtp_valid,
+      isMxValid: data.email_deliverability?.is_mx_valid,
+      isDisposable: data.email_quality?.is_disposable,
+      isCatchall: data.email_quality?.is_catchall,
+      qualityScore: data.email_quality?.score,
+      riskStatus: data.email_risk?.address_risk_status
     });
 
-    // 5. Analisis hasil validasi
-    const isFormatValid = data.is_valid_format?.value;
-    const isDisposable = data.is_disposable_email?.value;
-    const isMxFound = data.is_mx_found?.value;
-    const deliverability = data.deliverability;
+    // 4. Analisis hasil dari Email Reputation API
+    const deliverability = data.email_deliverability;
+    const quality = data.email_quality;
+    const risk = data.email_risk;
 
-    // 6. Validasi format dan MX record
-    if (!isFormatValid || !isMxFound) {
-      console.log(`❌ Invalid format or MX not found`);
+    // Cek deliverability
+    if (!deliverability || deliverability.status === 'undeliverable') {
+      console.log(`❌ Undeliverable email: ${email}`);
       return res.json({ 
         valid: false, 
-        message: 'Email tidak valid atau domain tidak ditemukan',
-        details: {
-          formatValid: isFormatValid,
-          mxFound: isMxFound
-        }
+        message: 'Email tidak dapat menerima pesan',
+        details: { deliverability: deliverability?.status }
       });
     }
 
-    // 7. Cek disposable email
-    if (isDisposable) {
-      console.log(`❌ Disposable email detected`);
+    // Cek format & MX
+    if (!deliverability?.is_format_valid) {
+      console.log(`❌ Invalid format: ${email}`);
+      return res.json({ 
+        valid: false, 
+        message: 'Format email tidak valid' 
+      });
+    }
+
+    if (!deliverability?.is_mx_valid) {
+      console.log(`❌ Invalid MX: ${email}`);
+      return res.json({ 
+        valid: false, 
+        message: 'Domain email tidak valid' 
+      });
+    }
+
+    // Cek disposable
+    if (quality?.is_disposable) {
+      console.log(`❌ Disposable email: ${email}`);
       return res.json({ 
         valid: false, 
         message: 'Email sementara/disposable tidak diperbolehkan' 
       });
     }
 
-    // 8. Cek deliverability
-    if (deliverability === 'UNDELIVERABLE') {
-      console.log(`❌ Undeliverable email`);
-      return res.json({ 
-        valid: false, 
-        message: 'Email tidak dapat menerima pesan' 
-      });
+    // Cek catchall (biasanya dianggap risky)
+    if (quality?.is_catchall) {
+      console.log(`⚠️ Catchall email detected: ${email}`);
+      // Bisa diizinkan dengan warning, atau ditolak tergantung kebijakan
+      // return res.json({ valid: false, message: 'Catchall email tidak diperbolehkan' });
     }
 
-    // 9. ✅ Email valid
-    console.log(`✅ Email validation SUCCESS`);
+    // Cek risk
+    if (risk?.address_risk_status === 'high' || risk?.domain_risk_status === 'high') {
+      console.log(`⚠️ High risk email: ${email}`);
+      // Bisa ditolak atau diizinkan dengan warning
+    }
+
+    // 5. ✅ Email valid
+    console.log(`✅ Email validation SUCCESS: ${email}`);
     return res.json({ 
-      valid: true, 
-      deliverability,
+      valid: true,
+      deliverability: deliverability?.status,
+      qualityScore: quality?.score,
+      riskStatus: risk?.address_risk_status,
       message: 'Email valid'
     });
 
@@ -289,7 +282,7 @@ async function handleEmailValidation(req, res, email) {
     console.error(`📚 Full error:`, err);
     
     // 🔄 Fail-open: Kalau API down, jangan block user booking
-    console.log(`⚠️ Fail-open: Allowing email due to external API error`);
+    console.log(`⚠️ Fail-open: Allowing ${email} due to external API error`);
     return res.json({ 
       valid: true, 
       message: 'Validasi eksternal gagal, dilewati',
@@ -300,49 +293,19 @@ async function handleEmailValidation(req, res, email) {
 
 // ==================== ENDPOINT STATUS ====================
 app.get('/api/validate-email-status', (req, res) => {
-  const apiKey = process.env.ABSTRACT_API_KEY;
-  const isValid = apiKey && apiKey.length > 10 && apiKey !== 'your_api_key_here';
+  const apiKey = process.env.ABSTRACT_API_KEY || '28cdc3adf33543cba045088c47a75c9f';
   
   res.json({
     status: 'OK',
-    apiKeyConfigured: !!apiKey,
-    apiKeyLength: apiKey ? apiKey.length : 0,
-    apiKeyValid: isValid,
-    apiKeyPreview: apiKey ? `${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}` : null,
-    message: isValid ? '✅ API Key valid' : '❌ API Key tidak valid atau tidak terkonfigurasi',
+    apiKeyConfigured: true,
+    apiKeyPreview: `${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}`,
+    apiProduct: 'Email Reputation API',
+    validationMethod: 'AbstractAPI Email Reputation + Local',
     endpoints: {
-      get: 'GET /api/validate-email?email=your@email.com',
-      post: 'POST /api/validate-email (body: { "email": "your@email.com" })',
+      validate: 'GET /api/validate-email?email=your@email.com',
       status: 'GET /api/validate-email-status'
     }
   });
-});
-
-// ==================== ENDPOINT TEST LANGSUNG ====================
-app.get('/api/test-email/:email', async (req, res) => {
-  const { email } = req.params;
-  
-  console.log(`🧪 Testing email: ${email}`);
-  
-  try {
-    const apiKey = process.env.ABSTRACT_API_KEY;
-    const apiUrl = `https://emailvalidation.abstractapi.com/v1/?api_key=${apiKey}&email=${encodeURIComponent(email)}`;
-    
-    const response = await fetch(apiUrl);
-    const data = await response.json();
-    
-    res.json({
-      testedEmail: email,
-      apiKeyUsed: apiKey ? `${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}` : null,
-      responseStatus: response.status,
-      data: data
-    });
-  } catch (error) {
-    res.status(500).json({
-      error: error.message,
-      testedEmail: email
-    });
-  }
 });
 
 // ==================== TICKET BOAT HELPER FUNCTIONS ====================
