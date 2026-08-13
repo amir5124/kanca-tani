@@ -549,13 +549,10 @@ app.post('/api/auth/logout', authenticateToken, async (req, res) => {
     }
 });
 
-// ==================== BOOKING ROUTES ====================
-// ==================== BOOKING ROUTES ====================
-// ==================== BOOKING ROUTES ====================
-// ==================== BOOKING ROUTES ====================
 app.post('/api/bookings', [
     body('customer.full_name').notEmpty().withMessage('Full name required'),
-    body('customer.whatsapp').notEmpty().withMessage('WhatsApp number required'),
+    // ✅ WhatsApp OPTIONAL - Hapus notEmpty()
+    body('customer.whatsapp').optional().isString().withMessage('WhatsApp must be a string'),
     body('customer.email').optional().isEmail().withMessage('Invalid email'),
     body('service_type').isIn(['transfer', 'fastboat', 'ticketboat']).withMessage('Invalid service type'),
     body('trip_type').isIn(['oneway', 'return']).withMessage('Invalid trip type'),
@@ -585,15 +582,15 @@ app.post('/api/bookings', [
             fb_dropoff_port,
             fb_depart_date,
             fb_depart_slot,
-            fb_depart_time,        // 🔥 HARUS diterima
+            fb_depart_time,
             fb_return_date,
             fb_return_slot,
-            fb_return_time,        // 🔥 HARUS diterima
+            fb_return_time,
             fb_nationality,
             fb_adult_count,
             fb_child_count,
-            fb_price_per_person,   // 🔥 HARUS diterima
-            fb_total_pax,          // 🔥 HARUS diterima
+            fb_price_per_person,
+            fb_total_pax,
             tb_pickup_location,
             tb_dropoff_location,
             tb_ticket_type,
@@ -688,18 +685,24 @@ app.post('/api/bookings', [
         else if (service_type === 'transfer') prefix = 'TRF';
         const bookingRef = generateBookingReference(prefix);
 
-        // Insert customer
+        // ============ 🔥 INSERT CUSTOMER - WhatsApp BISA NULL ============
         const [customerResult] = await connection.execute(
             `INSERT INTO booking_customers 
             (full_name, whatsapp, email, notes, booking_reference) 
             VALUES (?, ?, ?, ?, ?)`,
-            [customer.full_name, customer.whatsapp, customer.email || null, customer.notes || null, bookingRef]
+            [
+                customer.full_name, 
+                customer.whatsapp || null,  // ✅ Bisa NULL
+                customer.email || null, 
+                customer.notes || null, 
+                bookingRef
+            ]
         );
         const customerId = customerResult.insertId;
 
         const isReturn = trip_type === 'return';
 
-        // ============ 🔥 FIX: PERHITUNGAN HARGA ============
+        // ============ 🔥 PERHITUNGAN HARGA ============
         if (service_type === 'fastboat') {
             // ✅ Gunakan harga dari frontend
             const pricePerPerson = parseFloat(fb_price_per_person) || 0;
@@ -850,12 +853,12 @@ app.post('/api/bookings', [
                 fb_dropoff_port || null,
                 fb_depart_date || null,
                 fb_depart_slot || null,
-                fb_depart_time || null,  // 🔥 SAVE DEPARTURE TIME
+                fb_depart_time || null,
 
                 // 18-20: fb_return_date, fb_return_slot, fb_return_time
                 fb_return_date || null,
                 fb_return_slot || null,
-                fb_return_time || null,  // 🔥 SAVE RETURN TIME
+                fb_return_time || null,
 
                 // 21-23: fb_nationality, fb_adult_count, fb_child_count
                 fb_nationality || null,
