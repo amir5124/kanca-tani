@@ -128,58 +128,149 @@ function calculatePrice(basePrice, distanceKm, pricePerKm, isReturn, discountPer
     };
 }
 
+// ==================== VALIDASI EMAIL ====================
+
 function isValidEmailFormat(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-app.post('/api/validate-email', async (req, res) => {
-  const { email } = req.body;
+// ✅ FIX: Mendukung GET dan POST
+app.route('/api/validate-email')
+  .post(async (req, res) => {
+    const { email } = req.body;
+    await handleEmailValidation(req, res, email);
+  })
+  .get(async (req, res) => {
+    const { email } = req.query;
+    await handleEmailValidation(req, res, email);
+  });
 
+// Handler function yang sama untuk GET dan POST
+async function handleEmailValidation(req, res, email) {
+  // 📝 LOGGING - Untuk debugging
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log(`📧 Email Validation Request`);
+  console.log(`📧 Method: ${req.method}`);
+  console.log(`📧 Email: ${email}`);
+  console.log(`📧 IP: ${req.ip || req.connection?.remoteAddress}`);
+  console.log(`📧 Timestamp: ${new Date().toISOString()}`);
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+  // 1. Validasi email wajib diisi
   if (!email) {
-    return res.status(400).json({ valid: false, message: 'Email wajib diisi' });
+    console.log('❌ Validation failed: Email is empty');
+    return res.status(400).json({ 
+      valid: false, 
+      message: 'Email wajib diisi' 
+    });
   }
 
-  // Filter cepat sebelum hit API eksternal
+  // 2. Filter cepat - validasi format
   if (!isValidEmailFormat(email)) {
-    return res.json({ valid: false, message: 'Format email tidak valid' });
+    console.log(`❌ Validation failed: Invalid format for ${email}`);
+    return res.json({ 
+      valid: false, 
+      message: 'Format email tidak valid' 
+    });
   }
 
+  // 3. Panggil API eksternal AbstractAPI
   try {
-    const response = await fetch(
-      `https://emailvalidation.abstractapi.com/v1/?api_key=${process.env.ABSTRACT_API_KEY}&email=${encodeURIComponent(email)}`
-    );
+    console.log(`🔍 Calling AbstractAPI for: ${email}`);
+    console.log(`🔑 API Key available: ${process.env.ABSTRACT_API_KEY ? '✅ Yes' : '❌ No'}`);
+    
+    const apiUrl = `https://emailvalidation.abstractapi.com/v1/?api_key=${process.env.ABSTRACT_API_KEY}&email=${encodeURIComponent(email)}`;
+    console.log(`📡 API URL: ${apiUrl.replace(process.env.ABSTRACT_API_KEY, 'HIDDEN')}`);
+    
+    const response = await fetch(apiUrl);
+
+    console.log(`📡 AbstractAPI Response Status: ${response.status}`);
 
     if (!response.ok) {
+      console.error(`❌ AbstractAPI error: ${response.status}`);
       throw new Error(`API error: ${response.status}`);
     }
 
     const data = await response.json();
+    console.log(`✅ AbstractAPI Response received for: ${email}`);
+    console.log(`📊 Validation results:`, {
+      formatValid: data.is_valid_format?.value,
+      isDisposable: data.is_disposable_email?.value,
+      isMxFound: data.is_mx_found?.value,
+      deliverability: data.deliverability,
+      qualityScore: data.quality_score
+    });
 
+    // 4. Analisis hasil validasi
     const isFormatValid = data.is_valid_format?.value;
     const isDisposable = data.is_disposable_email?.value;
     const isMxFound = data.is_mx_found?.value;
-    const deliverability = data.deliverability; // DELIVERABLE, UNDELIVERABLE, RISKY, UNKNOWN
+    const deliverability = data.deliverability;
 
+    // 5. Validasi format dan MX record
     if (!isFormatValid || !isMxFound) {
-      return res.json({ valid: false, message: 'Email tidak valid atau domain tidak ditemukan' });
+      console.log(`❌ Validation failed: Invalid format or MX not found for ${email}`);
+      return res.json({ 
+        valid: false, 
+        message: 'Email tidak valid atau domain tidak ditemukan',
+        details: {
+          formatValid: isFormatValid,
+          mxFound: isMxFound
+        }
+      });
     }
 
+    // 6. Cek disposable email
     if (isDisposable) {
-      return res.json({ valid: false, message: 'Email sementara/disposable tidak diperbolehkan' });
+      console.log(`❌ Validation failed: Disposable email detected for ${email}`);
+      return res.json({ 
+        valid: false, 
+        message: 'Email sementara/disposable tidak diperbolehkan' 
+      });
     }
 
+    // 7. Cek deliverability
     if (deliverability === 'UNDELIVERABLE') {
-      return res.json({ valid: false, message: 'Email tidak dapat menerima pesan' });
+      console.log(`❌ Validation failed: Undeliverable email for ${email}`);
+      return res.json({ 
+        valid: false, 
+        message: 'Email tidak dapat menerima pesan' 
+      });
     }
 
-    // RISKY / UNKNOWN bisa kamu izinkan lolos tapi kasih warning, sesuai kebijakanmu
-    return res.json({ valid: true, deliverability });
+    // 8. ✅ Email valid
+    console.log(`✅ Email validation SUCCESS for: ${email}`);
+    return res.json({ 
+      valid: true, 
+      deliverability,
+      message: 'Email valid'
+    });
 
   } catch (err) {
-    console.error('Email validation error:', err.message);
-    // Fail-open: kalau API down, jangan block user booking
-    return res.json({ valid: true, message: 'Validasi eksternal gagal, dilewati' });
+    console.error(`❌ Email validation error for ${email}:`, err.message);
+    console.error(`📚 Full error:`, err);
+    
+    // 🔄 Fail-open: Kalau API down, jangan block user booking
+    console.log(`⚠️ Fail-open: Allowing ${email} due to external API error`);
+    return res.json({ 
+      valid: true, 
+      message: 'Validasi eksternal gagal, dilewati',
+      warning: true
+    });
   }
+}
+
+// ==================== ENDPOINT TEST ====================
+// Untuk testing, tambahkan endpoint ini (opsional)
+app.get('/api/validate-email-test', (req, res) => {
+  res.json({
+    status: 'OK',
+    message: 'Email validation endpoint is running',
+    endpoints: {
+      get: '/api/validate-email?email=your@email.com',
+      post: '/api/validate-email (body: { "email": "your@email.com" })'
+    }
+  });
 });
 
 // ==================== TICKET BOAT HELPER FUNCTIONS ====================
