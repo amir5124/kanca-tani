@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice - {{booking_reference}}</title>
+    <style>
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
+        body { 
+            font-family: Arial, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            padding: 20px; 
+        }
+        .invoice-box { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            border: 1px solid #ddd; 
+            padding: 30px; 
+            border-radius: 8px; 
+        }
+        .header { 
+            text-align: center; 
+            padding-bottom: 20px; 
+            border-bottom: 2px solid #E6F4FE; 
+        }
+        .logo { 
+            font-size: 28px; 
+            font-weight: bold; 
+            color: #1a5276; 
+        }
+        .title { 
+            font-size: 22px; 
+            color: #1a5276; 
+            margin: 10px 0; 
+        }
+        .row { 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 8px 0; 
+            border-bottom: 1px solid #f0f0f0; 
+        }
+        .row:last-child { 
+            border-bottom: none; 
+        }
+        .row-header { 
+            font-weight: bold; 
+            background: #f8f9fa; 
+            padding: 10px 0; 
+        }
+        .total-row { 
+            font-weight: bold; 
+            font-size: 18px; 
+            padding: 15px 0; 
+            border-top: 2px solid #1a5276; 
+        }
+        .status { 
+            display: inline-block; 
+            padding: 4px 12px; 
+            border-radius: 20px; 
+            font-weight: bold; 
+        }
+        .status-completed { 
+            background: #d4edda; 
+            color: #155724; 
+        }
+        .status-pending { 
+            background: #fff3cd; 
+            color: #856404; 
+        }
+        .status-confirmed { 
+            background: #cce5ff; 
+            color: #004085; 
+        }
+        .status-cancelled { 
+            background: #f8d7da; 
+            color: #721c24; 
+        }
+        .badge { 
+            display: inline-block; 
+            padding: 2px 10px; 
+            border-radius: 12px; 
+            font-size: 12px; 
+            font-weight: 600; 
+        }
+        .badge-transfer { 
+            background: #d1ecf1; 
+            color: #0c5460; 
+        }
+        .badge-fastboat { 
+            background: #cce5ff; 
+            color: #004085; 
+        }
+        .badge-ticketboat { 
+            background: #d4edda; 
+            color: #155724; 
+        }
+        .footer { 
+            text-align: center; 
+            padding-top: 20px; 
+            border-top: 1px solid #ddd; 
+            font-size: 12px; 
+            color: #666; 
+            margin-top: 20px; 
+        }
+        .table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin: 15px 0; 
+        }
+        .table th { 
+            background: #E6F4FE; 
+            padding: 10px; 
+            text-align: left; 
+        }
+        .table td { 
+            padding: 10px; 
+            border-bottom: 1px solid #eee; 
+        }
+        .table tr:last-child td { 
+            border-bottom: none; 
+        }
+        .right { 
+            text-align: right; 
+        }
+        .center { 
+            text-align: center; 
+        }
+        .section-title { 
+            font-size: 14px; 
+            font-weight: 600; 
+            color: #1a5276; 
+            margin-bottom: 8px; 
+        }
+        .info-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 8px 20px; 
+        }
+        .info-item { 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 4px 0; 
+            border-bottom: 1px solid #f0f0f0; 
+        }
+        .info-item .label { 
+            color: #666; 
+            font-weight: 500; 
+        }
+        .info-item .value { 
+            font-weight: 600; 
+            color: #1a1a2e; 
+        }
+        .payment-method { 
+            background: #f0f7ff; 
+            padding: 12px 16px; 
+            border-radius: 8px; 
+            margin: 10px 0; 
+            border-left: 4px solid #1a5276; 
+        }
+        .payment-method strong { 
+            color: #1a5276; 
+        }
+        @media print {
+            .invoice-box { 
+                border: none; 
+                padding: 0; 
+            }
+        }
+        @media (max-width: 600px) {
+            .info-grid { 
+                grid-template-columns: 1fr; 
+            }
+            .invoice-box { 
+                padding: 15px; 
+            }
+            .table th, .table td { 
+                padding: 6px; 
+                font-size: 13px; 
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="invoice-box">
+        <!-- ============ HEADER ============ -->
+        <div class="header">
+            <div class="logo">🚀 Gobali Traveling</div>
+            <div class="title">🧾 INVOICE</div>
+            <p>
+                Kode Booking: <strong>{{booking_reference}}</strong>
+                <span style="margin-left: 20px;">
+                    Status: 
+                    <span class="status status-{{status}}">
+                        {{#if (eq status "completed")}}✅ Selesai{{/if}}
+                        {{#if (eq status "pending")}}⏳ Pending{{/if}}
+                        {{#if (eq status "confirmed")}}📋 Dikonfirmasi{{/if}}
+                        {{#if (eq status "cancelled")}}❌ Dibatalkan{{/if}}
+                    </span>
+                </span>
+            </p>
+        </div>
+        
+        <!-- ============ INFO INVOICE ============ -->
+        <div style="padding: 15px 0;">
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="label">Tanggal Invoice</span>
+                    <span class="value">{{completed_at}}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Layanan</span>
+                    <span class="value">
+                        <span class="badge badge-{{service_type}}">
+                            {{#if (eq service_type "ticketboat")}}🚢{{/if}}
+                            {{#if (eq service_type "fastboat")}}⛴️{{/if}}
+                            {{#if (eq service_type "transfer")}}🚗{{/if}}
+                            {{service_label}}
+                        </span>
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ============ CUSTOMER INFO ============ -->
+        <div style="margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <h4 style="margin-bottom: 10px;">👤 Informasi Pelanggan</h4>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="label">Nama</span>
+                    <span class="value">{{customer_name}}</span>
+                </div>
+                {{#if customer_phone}}
+                <div class="info-item">
+                    <span class="label">Telepon</span>
+                    <span class="value">{{customer_phone}}</span>
+                </div>
+                {{/if}}
+                {{#if customer_email}}
+                <div class="info-item">
+                    <span class="label">Email</span>
+                    <span class="value">{{customer_email}}</span>
+                </div>
+                {{/if}}
+            </div>
+        </div>
+        
+        <!-- ============ TRIP DETAILS ============ -->
+        <div style="margin: 15px 0; padding: 15px; background: #E6F4FE; border-radius: 8px;">
+            <h4 style="margin-bottom: 10px;">📋 Detail Perjalanan</h4>
+            
+            <!-- TRANSFER / FASTBOAT -->
+            {{#if pickup_address}}
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="label">Pickup</span>
+                    <span class="value">{{pickup_address}}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Dropoff</span>
+                    <span class="value">{{dropoff_address}}</span>
+                </div>
+                {{#if distance_km}}
+                <div class="info-item">
+                    <span class="label">Jarak</span>
+                    <span class="value">{{distance_km}} km</span>
+                </div>
+                {{/if}}
+                {{#if duration_minutes}}
+                <div class="info-item">
+                    <span class="label">Durasi</span>
+                    <span class="value">{{duration_minutes}} menit</span>
+                </div>
+                {{/if}}
+            </div>
+            {{/if}}
+            
+            <!-- FASTBOAT SPESIFIK -->
+            {{#if fb_pickup_port}}
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #cce5ff;">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="label">Pelabuhan Asal</span>
+                        <span class="value">{{fb_pickup_port}}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Pelabuhan Tujuan</span>
+                        <span class="value">{{fb_dropoff_port}}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Tanggal Berangkat</span>
+                        <span class="value">{{fb_depart_date}}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Slot Berangkat</span>
+                        <span class="value">{{fb_depart_slot}}</span>
+                    </div>
+                    {{#if fb_return_date}}
+                    <div class="info-item">
+                        <span class="label">Tanggal Kembali</span>
+                        <span class="value">{{fb_return_date}}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Slot Kembali</span>
+                        <span class="value">{{fb_return_slot}}</span>
+                    </div>
+                    {{/if}}
+                    <div class="info-item">
+                        <span class="label">Kewarganegaraan</span>
+                        <span class="value">{{#if (eq fb_nationality "asing")}}Asing{{else}}Lokal{{/if}}</span>
+                    </div>
+                </div>
+            </div>
+            {{/if}}
+            
+            <!-- TICKET BOAT SPESIFIK -->
+            {{#if tb_pickup_location}}
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #cce5ff;">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="label">Pelabuhan Asal</span>
+                        <span class="value">{{tb_pickup_location}}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Pelabuhan Tujuan</span>
+                        <span class="value">{{tb_dropoff_location}}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Jenis Tiket</span>
+                        <span class="value">{{tb_ticket_type}}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Tanggal Berangkat</span>
+                        <span class="value">{{tb_depart_date}}</span>
+                    </div>
+                    {{#if tb_depart_time}}
+                    <div class="info-item">
+                        <span class="label">Jam Berangkat</span>
+                        <span class="value">{{tb_depart_time}}</span>
+                    </div>
+                    {{/if}}
+                    {{#if tb_return_date}}
+                    <div class="info-item">
+                        <span class="label">Tanggal Kembali</span>
+                        <span class="value">{{tb_return_date}}</span>
+                    </div>
+                    {{/if}}
+                    {{#if tb_return_time}}
+                    <div class="info-item">
+                        <span class="label">Jam Kembali</span>
+                        <span class="value">{{tb_return_time}}</span>
+                    </div>
+                    {{/if}}
+                    <div class="info-item">
+                        <span class="label">Penumpang</span>
+                        <span class="value">{{tb_adult_count}} Dewasa{{#if tb_child_count}}, {{tb_child_count}} Anak{{/if}}</span>
+                    </div>
+                    {{#if tb_total_pax}}
+                    <div class="info-item">
+                        <span class="label">Total Penumpang</span>
+                        <span class="value">{{tb_total_pax}} orang</span>
+                    </div>
+                    {{/if}}
+                </div>
+            </div>
+            {{/if}}
+            
+            <!-- TRIP TYPE -->
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #cce5ff;">
+                <div class="info-item">
+                    <span class="label">Tipe Perjalanan</span>
+                    <span class="value">{{#if (eq trip_type "return")}}Pulang Pergi{{else}}Sekali Jalan{{/if}}</span>
+                </div>
+                {{#if depart_datetime}}
+                <div class="info-item">
+                    <span class="label">Keberangkatan</span>
+                    <span class="value">{{depart_datetime}}</span>
+                </div>
+                {{/if}}
+                {{#if return_datetime}}
+                <div class="info-item">
+                    <span class="label">Kepulangan</span>
+                    <span class="value">{{return_datetime}}</span>
+                </div>
+                {{/if}}
+            </div>
+        </div>
+        
+        <!-- ============ PAYMENT METHOD ============ -->
+        <div class="payment-method">
+            <p style="margin: 0;">
+                <strong>💳 Metode Pembayaran:</strong> 
+                Pembayaran dilakukan secara <strong>LANGSUNG DI TEMPAT</strong> (Onsite Payment)
+            </p>
+            <p style="margin: 5px 0 0 0; font-size: 13px; color: #555;">
+                📍 Lokasi: {{app_address}}
+            </p>
+        </div>
+        
+        <!-- ============ PRICE TABLE ============ -->
+        <h4 style="margin-top: 15px;">💰 Rincian Biaya</h4>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Deskripsi</th>
+                    <th class="right">Jumlah</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Harga Dasar</td>
+                    <td class="right">{{base_price}}</td>
+                </tr>
+                
+                {{#if distance_cost}}
+                <tr>
+                    <td>Biaya Jarak ({{distance_km}} km)</td>
+                    <td class="right">{{distance_cost}}</td>
+                </tr>
+                {{/if}}
+                
+                {{#if tb_price_per_adult}}
+                <tr>
+                    <td>Tiket Dewasa ({{tb_adult_count}} × {{tb_price_per_adult}})</td>
+                    <td class="right">{{formatRupiah (multiply tb_adult_count tb_price_per_adult)}}</td>
+                </tr>
+                {{/if}}
+                
+                {{#if tb_price_per_child}}
+                <tr>
+                    <td>Tiket Anak ({{tb_child_count}} × {{tb_price_per_child}})</td>
+                    <td class="right">{{formatRupiah (multiply tb_child_count tb_price_per_child)}}</td>
+                </tr>
+                {{/if}}
+                
+                {{#if tb_port_fee}}
+                <tr>
+                    <td>Biaya Pelabuhan ({{tb_total_pax}} × {{tb_port_fee}})</td>
+                    <td class="right">{{formatRupiah (multiply tb_total_pax tb_port_fee)}}</td>
+                </tr>
+                {{/if}}
+                
+                {{#if discount_amount}}
+                <tr>
+                    <td style="color: #27ae60;">Diskon</td>
+                    <td class="right" style="color: #27ae60;">- {{discount_amount}}</td>
+                </tr>
+                {{/if}}
+                
+                <tr class="total-row">
+                    <td><strong>TOTAL</strong></td>
+                    <td class="right"><strong>{{final_price}}</strong></td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <!-- ============ NOTES ============ -->
+        {{#if notes}}
+        <div style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #f39c12;">
+            <p style="margin: 0; font-size: 13px;">
+                <strong>📝 Catatan:</strong> {{notes}}
+            </p>
+        </div>
+        {{/if}}
+        
+        <!-- ============ TERMS ============ -->
+        <div style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 8px; font-size: 12px;">
+            <p style="margin: 0;">
+                <strong>📌 Kebijakan Pembatalan:</strong> 
+                Pembatalan dikenakan biaya 25% dari total harga.
+            </p>
+            <p style="margin: 5px 0 0 0;">
+                <strong>✅ Pembayaran:</strong> 
+                Dilakukan langsung di tempat tujuan/pickup.
+            </p>
+            <p style="margin: 5px 0 0 0;">
+                <strong>📞 Kontak:</strong> 
+                {{app_phone}} (WhatsApp)
+            </p>
+        </div>
+        
+        <!-- ============ FOOTER ============ -->
+        <div class="footer">
+            <p><strong>{{app_name}}</strong></p>
+            <p>📍 {{app_address}}</p>
+            <p>📞 {{app_phone}} | ✉️ {{app_email}}</p>
+            <p>&copy; {{year}} {{app_name}} - All Rights Reserved</p>
+            <p style="margin-top: 5px; font-size: 11px; color: #999;">
+                Terima kasih telah menggunakan layanan {{app_name}}!
+            </p>
+        </div>
+    </div>
+</body>
+</html>

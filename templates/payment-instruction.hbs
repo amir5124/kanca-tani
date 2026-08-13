@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Instruksi Pembayaran</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+        }
+        .header { 
+            text-align: center; 
+            padding: 20px 0; 
+            border-bottom: 2px solid #E6F4FE; 
+        }
+        .logo { 
+            font-size: 24px; 
+            font-weight: bold; 
+            color: #1a5276; 
+        }
+        .content { padding: 20px 0; }
+        .booking-info { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            border-radius: 8px; 
+            margin: 15px 0; 
+        }
+        .info-row { 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 4px 0; 
+            border-bottom: 1px solid #eee; 
+        }
+        .info-row:last-child { border-bottom: none; }
+        .label { font-weight: 600; color: #555; }
+        .payment-info { 
+            background: #E6F4FE; 
+            padding: 15px; 
+            border-radius: 8px; 
+            margin: 15px 0; 
+        }
+        .total { 
+            font-size: 20px; 
+            font-weight: bold; 
+            color: #1a5276; 
+        }
+        .footer { 
+            text-align: center; 
+            padding: 20px 0; 
+            border-top: 1px solid #ddd; 
+            font-size: 12px; 
+            color: #666; 
+        }
+        .important { 
+            color: #e74c3c; 
+            font-weight: bold; 
+        }
+        .badge { 
+            display: inline-block; 
+            padding: 2px 10px; 
+            border-radius: 12px; 
+            font-size: 12px; 
+            font-weight: 600;
+        }
+        .badge-pending { background: #fff3cd; color: #856404; }
+        .badge-transfer { background: #d1ecf1; color: #0c5460; }
+        .badge-fastboat { background: #cce5ff; color: #004085; }
+        .badge-ticketboat { background: #d4edda; color: #155724; }
+        .service-icon { font-size: 18px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">🚀 Gobali Traveling</div>
+        <p>💳 Instruksi Pembayaran</p>
+    </div>
+    
+    <div class="content">
+        <p>Halo <strong>{{customer_name}}</strong>,</p>
+        <p>Terima kasih telah melakukan pemesanan di Gobali Traveling. Berikut adalah detail pemesanan Anda.</p>
+        
+        <div class="booking-info">
+            <h3>📋 Detail Pemesanan</h3>
+            <div class="info-row">
+                <span class="label">Kode Booking</span>
+                <span><strong>{{booking_reference}}</strong></span>
+            </div>
+            <div class="info-row">
+                <span class="label">Layanan</span>
+                <span>
+                    <span class="badge badge-{{service_type}}">
+                        {{#if (eq service_type "ticketboat")}}🚢{{/if}}
+                        {{#if (eq service_type "fastboat")}}⛴️{{/if}}
+                        {{#if (eq service_type "transfer")}}🚗{{/if}}
+                        {{service_label}}
+                    </span>
+                </span>
+            </div>
+            <div class="info-row">
+                <span class="label">Status</span>
+                <span><span class="badge badge-pending">Menunggu Pembayaran</span></span>
+            </div>
+            <div class="info-row">
+                <span class="label">Tanggal Keberangkatan</span>
+                <span>{{depart_datetime}}</span>
+            </div>
+            {{#if return_datetime}}
+            <div class="info-row">
+                <span class="label">Tanggal Kepulangan</span>
+                <span>{{return_datetime}}</span>
+            </div>
+            {{/if}}
+            
+            {{#if pickup_address}}
+            <div class="info-row">
+                <span class="label">Pickup</span>
+                <span>{{pickup_address}}</span>
+            </div>
+            {{/if}}
+            {{#if dropoff_address}}
+            <div class="info-row">
+                <span class="label">Dropoff</span>
+                <span>{{dropoff_address}}</span>
+            </div>
+            {{/if}}
+            
+            {{#if tb_pickup_location}}
+            <div class="info-row">
+                <span class="label">Pelabuhan Asal</span>
+                <span>{{tb_pickup_location}}</span>
+            </div>
+            {{/if}}
+            {{#if tb_dropoff_location}}
+            <div class="info-row">
+                <span class="label">Pelabuhan Tujuan</span>
+                <span>{{tb_dropoff_location}}</span>
+            </div>
+            {{/if}}
+            
+            {{#if tb_ticket_type}}
+            <div class="info-row">
+                <span class="label">Jenis Tiket</span>
+                <span>{{tb_ticket_type}}</span>
+            </div>
+            {{/if}}
+            
+            <div class="info-row">
+                <span class="label">Penumpang</span>
+                <span>{{total_pax}} orang</span>
+            </div>
+        </div>
+        
+        <div class="payment-info">
+            <h3>💰 Informasi Pembayaran</h3>
+            <p style="color: #e67e22; font-weight: bold; margin-bottom: 12px;">
+                ⚡ Pembayaran dilakukan secara LANGSUNG di tempat (onsite payment)
+            </p>
+            <div class="info-row">
+                <span class="label">Total Pembayaran</span>
+                <span class="total">{{final_price}}</span>
+            </div>
+            {{#if discount_amount}}
+            <div class="info-row">
+                <span class="label">Diskon</span>
+                <span style="color: #27ae60;">- {{discount_amount}}</span>
+            </div>
+            {{/if}}
+            <div class="info-row">
+                <span class="label">Metode Pembayaran</span>
+                <span>💰 Tunai / QRIS</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Lokasi Pembayaran</span>
+                <span>📍 Di tempat tujuan / lokasi pickup</span>
+            </div>
+        </div>
+        
+        <div style="background: #fff8e1; padding: 15px; border-radius: 8px; border-left: 4px solid #f39c12; margin: 15px 0;">
+            <p style="margin: 0; font-size: 14px;">
+                <strong>📌 Informasi Penting:</strong><br>
+                1. Pembayaran dilakukan <strong>langsung di tempat</strong> kepada driver / crew kami<br>
+                2. Tim kami akan menghubungi Anda melalui WhatsApp untuk konfirmasi<br>
+                3. Siapkan uang pas untuk mempercepat proses transaksi<br>
+                4. Simpan bukti pembayaran sebagai referensi
+            </p>
+        </div>
+        
+        <div class="important">
+            ⚠️ <strong>Perhatian:</strong> Jika terjadi perubahan jadwal atau pembatalan, harap segera konfirmasi melalui WhatsApp di <strong>{{app_phone}}</strong>.
+        </div>
+        
+        <p>Jika Anda memiliki pertanyaan, jangan ragu untuk menghubungi kami.</p>
+    </div>
+    
+    <div class="footer">
+        <p><strong>{{app_name}}</strong></p>
+        <p>📞 {{app_phone}} | ✉️ {{app_email}}</p>
+        <p>📍 {{app_address}}</p>
+        <p>&copy; {{year}} {{app_name}} - All Rights Reserved</p>
+    </div>
+</body>
+</html>
