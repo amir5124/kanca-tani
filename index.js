@@ -551,8 +551,8 @@ app.post('/api/auth/logout', authenticateToken, async (req, res) => {
 
 app.post('/api/bookings', [
     body('customer.full_name').notEmpty().withMessage('Full name required'),
-    // ✅ WhatsApp OPTIONAL - Hapus notEmpty()
-    body('customer.whatsapp').optional().isString().withMessage('WhatsApp must be a string'),
+    // ✅ WhatsApp OPTIONAL - nullable true
+    body('customer.whatsapp').optional({ nullable: true }).isString().withMessage('WhatsApp must be a string'),
     body('customer.email').optional().isEmail().withMessage('Invalid email'),
     body('service_type').isIn(['transfer', 'fastboat', 'ticketboat']).withMessage('Invalid service type'),
     body('trip_type').isIn(['oneway', 'return']).withMessage('Invalid trip type'),
@@ -606,26 +606,10 @@ app.post('/api/bookings', [
             referral_code
         } = req.body;
 
-        // ============ 🔥 LOGGING UNTUK DEBUG ============
+        // ============ 🔥 LOGGING ============
         console.log('📦 ====== BOOKING REQUEST ======');
         console.log('📦 service_type:', service_type);
-        console.log('📦 trip_type:', trip_type);
-        console.log('📦 depart_datetime:', depart_datetime);
-        console.log('📦 return_datetime:', return_datetime);
-        console.log('📦 fb_pickup_port:', fb_pickup_port);
-        console.log('📦 fb_dropoff_port:', fb_dropoff_port);
-        console.log('📦 fb_depart_date:', fb_depart_date);
-        console.log('📦 fb_depart_slot:', fb_depart_slot);
-        console.log('📦 fb_depart_time:', fb_depart_time);
-        console.log('📦 fb_return_date:', fb_return_date);
-        console.log('📦 fb_return_slot:', fb_return_slot);
-        console.log('📦 fb_return_time:', fb_return_time);
-        console.log('📦 fb_nationality:', fb_nationality);
-        console.log('📦 fb_adult_count:', fb_adult_count);
-        console.log('📦 fb_child_count:', fb_child_count);
-        console.log('📦 fb_price_per_person:', fb_price_per_person);
-        console.log('📦 fb_total_pax:', fb_total_pax);
-        console.log('📦 referral_code:', referral_code);
+        console.log('📦 customer.whatsapp:', customer?.whatsapp);
         console.log('📦 ================================');
 
         // Check min booking time
@@ -704,13 +688,11 @@ app.post('/api/bookings', [
 
         // ============ 🔥 PERHITUNGAN HARGA ============
         if (service_type === 'fastboat') {
-            // ✅ Gunakan harga dari frontend
             const pricePerPerson = parseFloat(fb_price_per_person) || 0;
             const adultCount = parseInt(fb_adult_count) || 1;
             const childCount = parseInt(fb_child_count) || 0;
             const totalPaxCount = parseInt(fb_total_pax) || (adultCount + childCount);
 
-            // Ambil child_price dari database
             childPriceValue = 0;
             if (fb_pickup_port && fb_dropoff_port) {
                 const [route] = await connection.execute(
@@ -726,7 +708,6 @@ app.post('/api/bookings', [
                 childPriceValue = pricePerPerson * 0.5;
             }
 
-            // 🔥 HITUNG TOTAL DENGAN BENAR
             let adultTotal = adultCount * pricePerPerson;
             let childTotal = childCount * childPriceValue;
             totalPrice = adultTotal + childTotal;
@@ -743,21 +724,9 @@ app.post('/api/bookings', [
             pricePerChild = childPriceValue;
             totalPax = totalPaxCount;
 
-            console.log('💰 Fastboat Price Calculation:', {
-                pricePerPerson,
-                childPriceValue,
-                adultCount,
-                childCount,
-                totalPax,
-                isReturn,
-                totalPrice,
-                finalPrice,
-                discountAmount,
-                commissionAmount
-            });
+            console.log('💰 Fastboat Price:', { totalPrice, finalPrice });
 
         } else if (service_type === 'ticketboat') {
-            // ============ TICKET BOAT ============
             if (!tb_pickup_location || !tb_dropoff_location || !tb_ticket_type) {
                 await connection.rollback();
                 return res.status(400).json({ error: 'Missing required fields for ticket boat' });
@@ -792,7 +761,6 @@ app.post('/api/bookings', [
             totalPax = adultCount + childCount;
 
         } else {
-            // ============ TRANSFER ============
             const priceCalc = calculatePrice(basePrice, distance_km, pricePerKm, isReturn, discountApplied);
             totalPrice = priceCalc.totalPrice;
             distanceCost = distance_km ? distance_km * pricePerKm : 0;
@@ -801,7 +769,7 @@ app.post('/api/bookings', [
             commissionAmount = finalPrice * (commissionPercent / 100);
         }
 
-        // ============ 🔥 INSERT BOOKING LENGKAP ============
+        // ============ 🔥 INSERT BOOKING ============
         const [bookingResult] = await connection.execute(
             `INSERT INTO bookings (
                 booking_reference, customer_id, service_type, trip_type,
@@ -833,81 +801,30 @@ app.post('/api/bookings', [
                 ?, ?, ?, ?, ?
             )`,
             [
-                // 1-4: booking_reference, customer_id, service_type, trip_type
                 bookingRef, customerId, service_type, trip_type,
-
-                // 5-10: pickup_address, pickup_lat, pickup_lng, dropoff_address, dropoff_lat, dropoff_lng
-                pickup_address || null,
-                pickup_lat || null,
-                pickup_lng || null,
-                dropoff_address || null,
-                dropoff_lat || null,
-                dropoff_lng || null,
-
-                // 11-12: distance_km, duration_minutes
-                distance_km || null,
-                duration_minutes || null,
-
-                // 13-17: fb_pickup_port, fb_dropoff_port, fb_depart_date, fb_depart_slot, fb_depart_time
-                fb_pickup_port || null,
-                fb_dropoff_port || null,
-                fb_depart_date || null,
-                fb_depart_slot || null,
-                fb_depart_time || null,
-
-                // 18-20: fb_return_date, fb_return_slot, fb_return_time
-                fb_return_date || null,
-                fb_return_slot || null,
-                fb_return_time || null,
-
-                // 21-23: fb_nationality, fb_adult_count, fb_child_count
-                fb_nationality || null,
-                fb_adult_count || null,
-                fb_child_count || null,
-
-                // 24-26: tb_pickup_location, tb_dropoff_location, tb_ticket_type
-                tb_pickup_location || null,
-                tb_dropoff_location || null,
-                tb_ticket_type || null,
-
-                // 27-30: tb_depart_date, tb_depart_time, tb_return_date, tb_return_time
-                tb_depart_date || null,
-                tb_depart_time || null,
-                tb_return_date || null,
-                tb_return_time || null,
-
-                // 31-32: tb_adult_count, tb_child_count
-                tb_adult_count || null,
-                tb_child_count || null,
-
-                // 33-36: tb_price_per_adult, tb_price_per_child, tb_port_fee, tb_total_pax
-                pricePerAdult || null,
-                pricePerChild || null,
-                portFee || null,
-                totalPax || 0,
-
-                // 37-38: depart_datetime, return_datetime
-                depart_datetime || null,
-                return_datetime || null,
-
-                // 39-43: base_price, distance_cost, total_price, discount_percent, discount_amount
-                basePrice,
-                distanceCost || 0,
-                totalPrice,
-                discountApplied,
-                discountAmount,
-
-                // 44-48: final_price, referral_code_used, admin_id, admin_commission, notes
-                finalPrice,
-                referralCodeUsed,
-                adminId,
-                commissionAmount,
+                pickup_address || null, pickup_lat || null, pickup_lng || null,
+                dropoff_address || null, dropoff_lat || null, dropoff_lng || null,
+                distance_km || null, duration_minutes || null,
+                fb_pickup_port || null, fb_dropoff_port || null,
+                fb_depart_date || null, fb_depart_slot || null, fb_depart_time || null,
+                fb_return_date || null, fb_return_slot || null, fb_return_time || null,
+                fb_nationality || null, fb_adult_count || null, fb_child_count || null,
+                tb_pickup_location || null, tb_dropoff_location || null, tb_ticket_type || null,
+                tb_depart_date || null, tb_depart_time || null,
+                tb_return_date || null, tb_return_time || null,
+                tb_adult_count || null, tb_child_count || null,
+                pricePerAdult || null, pricePerChild || null,
+                portFee || null, totalPax || 0,
+                depart_datetime || null, return_datetime || null,
+                basePrice, distanceCost || 0, totalPrice,
+                discountApplied, discountAmount,
+                finalPrice, referralCodeUsed, adminId, commissionAmount,
                 notes || null
             ]
         );
         const bookingId = bookingResult.insertId;
 
-        // Referral usage (pending)
+        // Referral usage
         if (adminId && referral_code) {
             await connection.execute(
                 `INSERT INTO referral_usage 
@@ -928,7 +845,7 @@ app.post('/api/bookings', [
 
         await connection.commit();
 
-        // ============ 🔔 SEND NOTIFICATION KE ADMIN ============
+        // ============ NOTIFIKASI ADMIN ============
         try {
             const [adminUsers] = await pool.execute(
                 `SELECT id, full_name FROM users WHERE role IN ('admin', 'admin_master') AND is_active = TRUE`
@@ -949,7 +866,7 @@ app.post('/api/bookings', [
                             via_referral: String((referralCodeUsed && admin.id === adminId) ? 'true' : 'false'),
                             timestamp: String(new Date().toISOString())
                         }
-                    ).catch(err => console.error(`❌ Failed to notify admin ${admin.id} (${admin.full_name}):`, err))
+                    ).catch(err => console.error(`❌ Failed to notify admin ${admin.id}:`, err))
                 ));
                 console.log(`📨 Booking notification sent to ${adminUsers.length} admin(s)`);
             }
@@ -957,7 +874,6 @@ app.post('/api/bookings', [
             console.error('❌ Failed to fetch/notify admin list:', notifErr);
         }
 
-        // ============ ✅ RESPONSE ============
         console.log(`✅ Booking ${bookingRef} created successfully`);
         console.log(`💰 Total: ${formatRupiah(totalPrice)}, Final: ${formatRupiah(finalPrice)}`);
 
