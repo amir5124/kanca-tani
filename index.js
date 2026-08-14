@@ -3729,6 +3729,484 @@ app.get('/api/fastboat/price', [
     }
 });
 
+// ==================== TRANSFER PRICES CRUD ====================
+
+// ============ CREATE TRANSFER PRICE (ADMIN ONLY) ============
+app.post('/api/admin/transfer-prices', authenticateAdmin, [
+    body('base_price').isNumeric().withMessage('Base price must be a number'),
+    body('price_per_km').isNumeric().withMessage('Price per km must be a number'),
+    body('is_active').optional().isBoolean().withMessage('is_active must be boolean')
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { base_price, price_per_km, is_active } = req.body;
+
+    try {
+        // Jika is_active = true, non-aktifkan semua harga lain yang aktif
+        if (is_active) {
+            await pool.execute(
+                'UPDATE transfer_prices SET is_active = 0 WHERE is_active = 1'
+            );
+        }
+
+        const [result] = await pool.execute(
+            `INSERT INTO transfer_prices 
+            (base_price, price_per_km, is_active, created_by, updated_by) 
+            VALUES (?, ?, ?, ?, ?)`,
+            [
+                base_price,
+                price_per_km,
+                is_active !== undefined ? (is_active ? 1 : 0) : 1,
+                req.user.full_name || 'admin',
+                req.user.full_name || 'admin'
+            ]
+        );
+
+        const [newPrice] = await pool.execute(
+            'SELECT * FROM transfer_prices WHERE id = ?',
+            [result.insertId]
+        );
+
+        res.status(201).json({
+            success: true,
+            message: 'Transfer price created successfully',
+            data: newPrice[0]
+        });
+    } catch (error) {
+        console.error('Create transfer price error:', error);
+        res.status(500).json({ error: 'Internal server error', message: error.message });
+    }
+});
+
+// ============ GET ALL TRANSFER PRICES (ADMIN ONLY) ============
+app.get('/api/admin/transfer-prices', authenticateAdmin, async (req, res) => {
+    const { is_active, limit = 50, offset = 0 } = req.query;
+
+    try {
+        const limitInt = parseInt(limit) || 50;
+        const offsetInt = parseInt(offset) || 0;
+
+        let query = 'SELECT * FROM transfer_prices WHERE 1=1';
+        let params = [];
+
+        if (is_active !== undefined) {
+            query += ' AND is_active = ?';
+            params.push(is_active === 'true' ? 1 : 0);
+        }
+
+        query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+        params.push(limitInt, offsetInt);
+
+        const [prices] = await pool.execute(query, params);
+
+        const [countResult] = await pool.execute(
+            'SELECT COUNT(*) as total FROM transfer_prices'
+        );
+
+        // Ambil harga yang aktif
+        const [activePrice] = await pool.execute(
+            'SELECT * FROM transfer_prices WHERE is_active = 1 LIMIT 1'
+        );
+
+        res.json({
+            success: true,
+            data: prices,
+            active_price: activePrice[0] || null,
+            total: countResult[0].total,
+            pagination: {
+                limit: limitInt,
+                offset: offsetInt
+            }
+        });
+    } catch (error) {
+        console.error('Get transfer prices error:', error);
+        res.status(500).json({ error: 'Internal server error', message: error.message });
+    }
+});
+
+// ============ GET TRANSFER PRICE BY ID (ADMIN ONLY) ============
+app.get('/api/admin/transfer-prices/:id', authenticateAdmin, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const [prices] = await pool.execute(
+            'SELECT * FROM transfer_prices WHERE id = ?',
+            [id]
+        );
+
+        if (prices.length === 0) {
+            return res.status(404).json({ error: 'Transfer price not found' });
+        }
+
+        res.json({
+            success: true,
+            data: prices[0]
+        });
+    } catch (error) {
+        console.error('Get transfer price error:', error);
+        res.status(500).json({ error: 'Internal server error', message: error.message });
+    }
+});
+
+// ============ UPDATE TRANSFER PRICE (ADMIN ONLY) ============
+app.put('/api/admin/transfer-prices/:id', authenticateAdmin, [
+    body('base_price').optional().isNumeric().withMessage('Base price must be a number'),
+    body('price_per_km').optional().isNumeric().withMessage('Price per km must be a number'),
+    body('is_active').optional().isBoolean().withMessage('is_active must be boolean')
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { id } = req.params;
+    const { base_price, price_per_km, is_active } = req.body;
+
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    try {
+        const [existing] = await connection.execute(
+            'SELECT * FROM transfer_prices WHERE id = ?',
+            [id]
+        );
+
+        if (existing.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ error: 'Transfer price not found' });
+        }
+
+        // Jika is_active = true, non-aktifkan semua harga lain yang aktif
+        if (is_active === true) {
+            await connection.execute(
+                'UPDATE transfer_prices SET is_active = 0 WHERE is_active = 1 AND id != ?',
+                [id]
+            );
+        }
+
+        const updates = [];
+        const values = [];
+
+        if (base_price !== undefined) {
+            updates.push('base_price = ?');
+            values.push(base_price);
+        }
+        if (price_per_km !== undefined) {
+            updates.push('price_per_km = ?');
+            values.push(price_per_km);
+        }
+        if (is_active !== undefined) {
+            updates.push('is_active = ?');
+            values.push(is_active ? 1 : 0);
+        }
+
+        if (updates.length === 0) {
+            await connection.rollback();
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        updates.push('updated_by = ?');
+        values.push(req.user.full_name || 'admin');
+        values.push(id);
+
+        await connection.execute(
+            `UPDATE transfer_prices SET ${updates.join(', ')} WHERE id = ?`,
+            values
+        );
+
+        await connection.commit();
+
+        const [updatedPrice] = await pool.execute(
+            'SELECT * FROM transfer_prices WHERE id = ?',
+            [id]
+        );
+
+        res.json({
+            success: true,
+            message: 'Transfer price updated successfully',
+            data: updatedPrice[0]
+        });
+    } catch (error) {
+        await connection.rollback();
+        console.error('Update transfer price error:', error);
+        res.status(500).json({ error: 'Internal server error', message: error.message });
+    } finally {
+        connection.release();
+    }
+});
+
+// ============ DELETE TRANSFER PRICE (ADMIN ONLY) ============
+app.delete('/api/admin/transfer-prices/:id', authenticateAdmin, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const [existing] = await pool.execute(
+            'SELECT id, is_active FROM transfer_prices WHERE id = ?',
+            [id]
+        );
+
+        if (existing.length === 0) {
+            return res.status(404).json({ error: 'Transfer price not found' });
+        }
+
+        // Cegah menghapus harga yang sedang aktif
+        if (existing[0].is_active === 1) {
+            return res.status(400).json({
+                error: 'Cannot delete active transfer price. Please deactivate it first or set another price as active.'
+            });
+        }
+
+        // Cek apakah harga ini digunakan di booking
+        const [used] = await pool.execute(
+            `SELECT COUNT(*) as count FROM bookings WHERE service_type = 'transfer'`
+        );
+        // Hanya soft delete jika sudah digunakan
+        if (used[0].count > 0) {
+            await pool.execute(
+                'UPDATE transfer_prices SET is_active = 0 WHERE id = ?',
+                [id]
+            );
+            return res.json({
+                success: true,
+                message: 'Transfer price deactivated (soft delete) because it is used in existing bookings',
+                data: { id: parseInt(id), is_active: false }
+            });
+        }
+
+        // Hard delete jika belum pernah digunakan
+        await pool.execute(
+            'DELETE FROM transfer_prices WHERE id = ?',
+            [id]
+        );
+
+        res.json({
+            success: true,
+            message: 'Transfer price deleted successfully',
+            data: { id: parseInt(id) }
+        });
+    } catch (error) {
+        console.error('Delete transfer price error:', error);
+        res.status(500).json({ error: 'Internal server error', message: error.message });
+    }
+});
+
+// ============ TOGGLE TRANSFER PRICE ACTIVE (ADMIN ONLY) ============
+app.patch('/api/admin/transfer-prices/:id/toggle', authenticateAdmin, async (req, res) => {
+    const { id } = req.params;
+
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    try {
+        const [existing] = await connection.execute(
+            'SELECT id, is_active FROM transfer_prices WHERE id = ?',
+            [id]
+        );
+
+        if (existing.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ error: 'Transfer price not found' });
+        }
+
+        const newStatus = existing[0].is_active === 1 ? 0 : 1;
+
+        // Jika akan diaktifkan, non-aktifkan semua harga lain yang aktif
+        if (newStatus === 1) {
+            await connection.execute(
+                'UPDATE transfer_prices SET is_active = 0 WHERE is_active = 1 AND id != ?',
+                [id]
+            );
+        }
+
+        await connection.execute(
+            'UPDATE transfer_prices SET is_active = ?, updated_by = ? WHERE id = ?',
+            [newStatus, req.user.full_name || 'admin', id]
+        );
+
+        await connection.commit();
+
+        const [updatedPrice] = await pool.execute(
+            'SELECT * FROM transfer_prices WHERE id = ?',
+            [id]
+        );
+
+        res.json({
+            success: true,
+            message: `Transfer price ${newStatus ? 'activated' : 'deactivated'} successfully`,
+            data: updatedPrice[0]
+        });
+    } catch (error) {
+        await connection.rollback();
+        console.error('Toggle transfer price error:', error);
+        res.status(500).json({ error: 'Internal server error', message: error.message });
+    } finally {
+        connection.release();
+    }
+});
+
+// ============ GET ACTIVE TRANSFER PRICE (PUBLIC) ============
+app.get('/api/transfer-price', async (req, res) => {
+    try {
+        const [price] = await pool.execute(
+            'SELECT base_price, price_per_km FROM transfer_prices WHERE is_active = 1 LIMIT 1'
+        );
+
+        if (price.length === 0) {
+            // Return default jika tidak ada data
+            return res.json({
+                success: true,
+                data: {
+                    base_price: 100000,
+                    price_per_km: 4000
+                },
+                is_default: true
+            });
+        }
+
+        res.json({
+            success: true,
+            data: price[0],
+            is_default: false
+        });
+    } catch (error) {
+        console.error('Get active transfer price error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// ============ CALCULATE TRANSFER PRICE (PUBLIC) ============
+app.get('/api/transfer-price/calculate', [
+    query('distance_km').isNumeric().withMessage('Distance in km is required'),
+    query('is_return').optional().isBoolean().withMessage('is_return must be boolean')
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { distance_km, is_return = false } = req.query;
+    const distance = parseFloat(distance_km);
+    const isReturn = is_return === 'true' || is_return === true;
+
+    try {
+        // Ambil harga aktif
+        const [price] = await pool.execute(
+            'SELECT base_price, price_per_km FROM transfer_prices WHERE is_active = 1 LIMIT 1'
+        );
+
+        let basePrice = 100000;
+        let pricePerKm = 4000;
+
+        if (price.length > 0) {
+            basePrice = parseFloat(price[0].base_price);
+            pricePerKm = parseFloat(price[0].price_per_km);
+        }
+
+        const distanceCost = distance * pricePerKm;
+        let total = basePrice + distanceCost;
+
+        if (isReturn) {
+            total *= 2;
+        }
+
+        res.json({
+            success: true,
+            calculation: {
+                base_price: basePrice,
+                price_per_km: pricePerKm,
+                distance_km: distance,
+                distance_cost: distanceCost,
+                is_return: isReturn,
+                total_price: total,
+                currency: 'IDR'
+            }
+        });
+    } catch (error) {
+        console.error('Calculate transfer price error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// ============ BULK CREATE TRANSFER PRICES (ADMIN ONLY) ============
+app.post('/api/admin/transfer-prices/bulk', authenticateAdmin, [
+    body('prices').isArray().withMessage('Prices must be an array'),
+    body('prices.*.base_price').isNumeric().withMessage('Base price must be a number'),
+    body('prices.*.price_per_km').isNumeric().withMessage('Price per km must be a number')
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { prices } = req.body;
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    try {
+        const created = [];
+        const errors_list = [];
+
+        for (const price of prices) {
+            try {
+                const { base_price, price_per_km, is_active } = price;
+
+                // Jika is_active = true, non-aktifkan semua harga lain yang aktif
+                if (is_active) {
+                    await connection.execute(
+                        'UPDATE transfer_prices SET is_active = 0 WHERE is_active = 1'
+                    );
+                }
+
+                const [result] = await connection.execute(
+                    `INSERT INTO transfer_prices 
+                    (base_price, price_per_km, is_active, created_by, updated_by) 
+                    VALUES (?, ?, ?, ?, ?)`,
+                    [
+                        base_price,
+                        price_per_km,
+                        is_active !== undefined ? (is_active ? 1 : 0) : 0,
+                        req.user.full_name || 'admin',
+                        req.user.full_name || 'admin'
+                    ]
+                );
+
+                const [newPrice] = await connection.execute(
+                    'SELECT * FROM transfer_prices WHERE id = ?',
+                    [result.insertId]
+                );
+
+                created.push(newPrice[0]);
+            } catch (err) {
+                errors_list.push({
+                    price: price,
+                    error: err.message
+                });
+            }
+        }
+
+        await connection.commit();
+
+        res.status(201).json({
+            success: true,
+            message: `${created.length} transfer prices created successfully`,
+            data: created,
+            errors: errors_list,
+            total_attempted: prices.length,
+            total_created: created.length,
+            total_errors: errors_list.length
+        });
+    } catch (error) {
+        await connection.rollback();
+        console.error('Bulk create transfer prices error:', error);
+        res.status(500).json({ error: 'Internal server error', message: error.message });
+    } finally {
+        connection.release();
+    }
+});
+
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({ error: 'Something went wrong!' });
