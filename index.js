@@ -623,16 +623,33 @@ app.post('/api/bookings', [
             });
         }
 
-        // Get settings
+        // ============ 🔥 FIX: AMBIL HARGA DARI transfer_prices (AKTIF) ============
+        // Ambil harga transfer yang aktif dari tabel transfer_prices
+        const [transferPrice] = await connection.execute(
+            'SELECT base_price, price_per_km FROM transfer_prices WHERE is_active = 1 LIMIT 1'
+        );
+
+        let basePrice = 100000;
+        let pricePerKm = 4000;
+
+        if (transferPrice.length > 0) {
+            basePrice = parseFloat(transferPrice[0].base_price) || 100000;
+            pricePerKm = parseFloat(transferPrice[0].price_per_km) || 4000;
+            console.log('💰 Harga dari transfer_prices (aktif):', { basePrice, pricePerKm });
+        } else {
+            console.log('⚠️ Tidak ada harga aktif di transfer_prices, menggunakan default');
+        }
+
+        // Ambil diskon dan komisi dari settings
         const [settings] = await connection.execute(
-            'SELECT setting_key, setting_value FROM settings WHERE setting_key IN ("base_price", "price_per_km", "discount_percent", "commission_percent")'
+            'SELECT setting_key, setting_value FROM settings WHERE setting_key IN ("discount_percent", "commission_percent")'
         );
         const settingsMap = {};
         settings.forEach(s => settingsMap[s.setting_key] = parseFloat(s.setting_value));
-        const basePrice = settingsMap.base_price || 100000;
-        const pricePerKm = settingsMap.price_per_km || 4000;
         const discountPercent = settingsMap.discount_percent || 5;
         const commissionPercent = settingsMap.commission_percent || 5;
+
+        console.log('📊 Settings:', { discountPercent, commissionPercent });
 
         let adminId = null;
         let discountApplied = 0;
@@ -761,12 +778,25 @@ app.post('/api/bookings', [
             totalPax = adultCount + childCount;
 
         } else {
+            // 🔥 TRANSFER - Gunakan harga dari transfer_prices
             const priceCalc = calculatePrice(basePrice, distance_km, pricePerKm, isReturn, discountApplied);
             totalPrice = priceCalc.totalPrice;
             distanceCost = distance_km ? distance_km * pricePerKm : 0;
             discountAmount = priceCalc.discountAmount;
             finalPrice = priceCalc.finalPrice;
             commissionAmount = finalPrice * (commissionPercent / 100);
+
+            console.log('💰 Transfer Price Details:', {
+                basePrice,
+                pricePerKm,
+                distance_km,
+                distanceCost,
+                isReturn,
+                discountApplied,
+                totalPrice,
+                discountAmount,
+                finalPrice
+            });
         }
 
         // ============ 🔥 INSERT BOOKING ============
