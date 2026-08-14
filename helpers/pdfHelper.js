@@ -70,61 +70,71 @@ function loadInvoiceHtml(bookingData) {
     const source = fs.readFileSync(templatePath, 'utf8');
     const template = handlebars.compile(source);
 
+    const serviceType = bookingData.service_type;
+
     return template({
         // Identitas booking
         booking_reference: bookingData.booking_reference,
+        status: bookingData.status || 'completed',
         status_badge: statusBadge(bookingData.status || 'completed'),
         completed_at: new Date().toLocaleString('id-ID', {
             day: '2-digit', month: 'long', year: 'numeric',
             hour: '2-digit', minute: '2-digit'
         }),
-        service_label: serviceLabel(bookingData.service_type),
+        service_type: serviceType,
+        service_label: serviceLabel(serviceType),
+        trip_type: bookingData.trip_type || null,
+        depart_datetime: bookingData.depart_datetime || null,
+        return_datetime: bookingData.trip_type === 'return' ? (bookingData.return_datetime || null) : null,
 
         // Data pelanggan
         customer_name: bookingData.customer_name || 'Customer',
-        customer_phone: bookingData.customer_phone || '-',
+        customer_phone: bookingData.customer_phone || null,
         customer_email: bookingData.customer_email || null,
 
-        // Transfer / Fastboat
-        pickup_address: bookingData.pickup_address || null,
-        dropoff_address: bookingData.dropoff_address || null,
-        distance_km: bookingData.distance_km || null,
-        duration_minutes: bookingData.duration_minutes || null,
+        // Transfer -- hanya diisi kalau service_type transfer
+        pickup_address: serviceType === 'transfer' ? (bookingData.pickup_address || null) : null,
+        dropoff_address: serviceType === 'transfer' ? (bookingData.dropoff_address || null) : null,
+        distance_km: serviceType === 'transfer' ? (bookingData.distance_km || null) : null,
+        duration_minutes: serviceType === 'transfer' ? (bookingData.duration_minutes || null) : null,
 
-        // Fastboat spesifik
-        fb_pickup_port: bookingData.fb_pickup_port || null,
-        fb_dropoff_port: bookingData.fb_dropoff_port || null,
-        fb_depart_date: bookingData.fb_depart_date || null,
-        fb_depart_slot: bookingData.fb_depart_slot || null,
-        fb_return_date: bookingData.fb_return_date || null,
-        fb_return_slot: bookingData.fb_return_slot || null,
+        // Fastboat -- hanya diisi kalau service_type fastboat
+        fb_pickup_port: serviceType === 'fastboat' ? (bookingData.fb_pickup_port || null) : null,
+        fb_dropoff_port: serviceType === 'fastboat' ? (bookingData.fb_dropoff_port || null) : null,
+        fb_depart_date: serviceType === 'fastboat' ? (bookingData.fb_depart_date || null) : null,
+        fb_depart_slot: serviceType === 'fastboat' ? (bookingData.fb_depart_slot || null) : null,
+        fb_return_date: serviceType === 'fastboat' ? (bookingData.fb_return_date || null) : null,
+        fb_return_slot: serviceType === 'fastboat' ? (bookingData.fb_return_slot || null) : null,
+        fb_nationality: serviceType === 'fastboat' ? (bookingData.fb_nationality || null) : null,
         fb_adult_count: bookingData.fb_adult_count || 0,
         fb_child_count: bookingData.fb_child_count || 0,
 
-        // Ticket boat spesifik
-        tb_pickup_location: bookingData.tb_pickup_location || null,
-        tb_dropoff_location: bookingData.tb_dropoff_location || null,
-        tb_ticket_type: bookingData.tb_ticket_type || null,
-        tb_depart_date: bookingData.tb_depart_date || null,
-        tb_depart_time: bookingData.tb_depart_time || null,
-        tb_return_date: bookingData.tb_return_date || null,
-        tb_return_time: bookingData.tb_return_time || null,
+        // Ticket boat -- hanya diisi kalau service_type ticketboat
+        tb_pickup_location: serviceType === 'ticketboat' ? (bookingData.tb_pickup_location || null) : null,
+        tb_dropoff_location: serviceType === 'ticketboat' ? (bookingData.tb_dropoff_location || null) : null,
+        tb_ticket_type: serviceType === 'ticketboat' ? (bookingData.tb_ticket_type || null) : null,
+        tb_depart_date: serviceType === 'ticketboat' ? (bookingData.tb_depart_date || null) : null,
+        tb_depart_time: serviceType === 'ticketboat' ? (bookingData.tb_depart_time || null) : null,
+        tb_return_date: serviceType === 'ticketboat' ? (bookingData.tb_return_date || null) : null,
+        tb_return_time: serviceType === 'ticketboat' ? (bookingData.tb_return_time || null) : null,
         tb_adult_count: bookingData.tb_adult_count || 0,
         tb_child_count: bookingData.tb_child_count || 0,
         tb_total_pax: bookingData.tb_total_pax || null,
-        tb_price_per_adult: bookingData.tb_price_per_adult
-            ? formatRupiah(bookingData.tb_price_per_adult) : null,
-        tb_price_per_child: bookingData.tb_price_per_child
-            ? formatRupiah(bookingData.tb_price_per_child) : null,
-        tb_port_fee: bookingData.tb_port_fee
-            ? formatRupiah(bookingData.tb_port_fee) : null,
+
+        // PENTING: kirim angka MENTAH (bukan string yang sudah diformat)
+        // supaya helper {{multiply}} di template bisa menghitung dengan benar.
+        // Formatnya dilakukan di template lewat {{formatRupiah ...}}.
+        tb_price_per_adult: serviceType === 'ticketboat' ? (bookingData.tb_price_per_adult || null) : null,
+        tb_price_per_child: (serviceType === 'ticketboat' && bookingData.tb_child_count)
+            ? (bookingData.tb_price_per_child || null) : null,
+        tb_port_fee: serviceType === 'ticketboat' ? (bookingData.tb_port_fee || null) : null,
 
         // Total PAX
         total_pax: getTotalPax(bookingData),
 
         // Rincian biaya
         base_price: formatRupiah(bookingData.base_price || 0),
-        distance_cost: bookingData.distance_cost
+        distance_cost: (serviceType === 'transfer' && bookingData.distance_cost)
             ? formatRupiah(bookingData.distance_cost) : null,
         discount_amount: bookingData.discount_amount
             ? formatRupiah(bookingData.discount_amount) : null,

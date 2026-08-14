@@ -252,7 +252,7 @@
         <div style="margin: 15px 0; padding: 15px; background: #E6F4FE; border-radius: 8px;">
             <h4 style="margin-bottom: 10px;">📋 Detail Perjalanan</h4>
             
-            <!-- TRANSFER / FASTBOAT -->
+            <!-- TRANSFER -->
             {{#if pickup_address}}
             <div class="info-grid">
                 <div class="info-item">
@@ -275,6 +275,18 @@
                     <span class="value">{{duration_minutes}} menit</span>
                 </div>
                 {{/if}}
+                {{#if depart_datetime}}
+                <div class="info-item">
+                    <span class="label">Keberangkatan</span>
+                    <span class="value">{{depart_datetime}}</span>
+                </div>
+                {{/if}}
+                {{#if return_datetime}}
+                <div class="info-item">
+                    <span class="label">Kepulangan</span>
+                    <span class="value">{{return_datetime}}</span>
+                </div>
+                {{/if}}
             </div>
             {{/if}}
             
@@ -294,24 +306,30 @@
                         <span class="label">Tanggal Berangkat</span>
                         <span class="value">{{fb_depart_date}}</span>
                     </div>
+                    {{#if fb_depart_slot}}
                     <div class="info-item">
                         <span class="label">Slot Berangkat</span>
                         <span class="value">{{fb_depart_slot}}</span>
                     </div>
+                    {{/if}}
                     {{#if fb_return_date}}
                     <div class="info-item">
                         <span class="label">Tanggal Kembali</span>
                         <span class="value">{{fb_return_date}}</span>
                     </div>
+                    {{#if fb_return_slot}}
                     <div class="info-item">
                         <span class="label">Slot Kembali</span>
                         <span class="value">{{fb_return_slot}}</span>
                     </div>
                     {{/if}}
+                    {{/if}}
+                    {{#if fb_nationality}}
                     <div class="info-item">
                         <span class="label">Kewarganegaraan</span>
                         <span class="value">{{#if (eq fb_nationality "asing")}}Asing{{else}}Lokal{{/if}}</span>
                     </div>
+                    {{/if}}
                 </div>
             </div>
             {{/if}}
@@ -328,10 +346,12 @@
                         <span class="label">Pelabuhan Tujuan</span>
                         <span class="value">{{tb_dropoff_location}}</span>
                     </div>
+                    {{#if tb_ticket_type}}
                     <div class="info-item">
                         <span class="label">Jenis Tiket</span>
                         <span class="value">{{tb_ticket_type}}</span>
                     </div>
+                    {{/if}}
                     <div class="info-item">
                         <span class="label">Tanggal Berangkat</span>
                         <span class="value">{{tb_depart_date}}</span>
@@ -368,25 +388,15 @@
             </div>
             {{/if}}
             
-            <!-- TRIP TYPE -->
+            <!-- TRIP TYPE (transfer only) -->
+            {{#if (eq service_type "transfer")}}
             <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #cce5ff;">
                 <div class="info-item">
                     <span class="label">Tipe Perjalanan</span>
                     <span class="value">{{#if (eq trip_type "return")}}Pulang Pergi{{else}}Sekali Jalan{{/if}}</span>
                 </div>
-                {{#if depart_datetime}}
-                <div class="info-item">
-                    <span class="label">Keberangkatan</span>
-                    <span class="value">{{depart_datetime}}</span>
-                </div>
-                {{/if}}
-                {{#if return_datetime}}
-                <div class="info-item">
-                    <span class="label">Kepulangan</span>
-                    <span class="value">{{return_datetime}}</span>
-                </div>
-                {{/if}}
             </div>
+            {{/if}}
         </div>
         
         <!-- ============ PAYMENT METHOD ============ -->
@@ -424,21 +434,21 @@
                 
                 {{#if tb_price_per_adult}}
                 <tr>
-                    <td>Tiket Dewasa ({{tb_adult_count}} × {{tb_price_per_adult}})</td>
+                    <td>Tiket Dewasa ({{tb_adult_count}} × {{formatRupiah tb_price_per_adult}})</td>
                     <td class="right">{{formatRupiah (multiply tb_adult_count tb_price_per_adult)}}</td>
                 </tr>
                 {{/if}}
                 
                 {{#if tb_price_per_child}}
                 <tr>
-                    <td>Tiket Anak ({{tb_child_count}} × {{tb_price_per_child}})</td>
+                    <td>Tiket Anak ({{tb_child_count}} × {{formatRupiah tb_price_per_child}})</td>
                     <td class="right">{{formatRupiah (multiply tb_child_count tb_price_per_child)}}</td>
                 </tr>
                 {{/if}}
                 
                 {{#if tb_port_fee}}
                 <tr>
-                    <td>Biaya Pelabuhan ({{tb_total_pax}} × {{tb_port_fee}})</td>
+                    <td>Biaya Pelabuhan ({{tb_total_pax}} × {{formatRupiah tb_port_fee}})</td>
                     <td class="right">{{formatRupiah (multiply tb_total_pax tb_port_fee)}}</td>
                 </tr>
                 {{/if}}

@@ -104,50 +104,97 @@
                 <span class="label">Status</span>
                 <span><span class="badge badge-pending">Menunggu Pembayaran</span></span>
             </div>
-            <div class="info-row">
-                <span class="label">Tanggal Keberangkatan</span>
-                <span>{{depart_datetime}}</span>
-            </div>
-            {{#if return_datetime}}
-            <div class="info-row">
-                <span class="label">Tanggal Kepulangan</span>
-                <span>{{return_datetime}}</span>
-            </div>
+
+            <!-- ===== TRANSFER ===== -->
+            {{#if (eq service_type "transfer")}}
+                {{#if pickup_address}}
+                <div class="info-row">
+                    <span class="label">Pickup</span>
+                    <span>{{pickup_address}}</span>
+                </div>
+                {{/if}}
+                {{#if dropoff_address}}
+                <div class="info-row">
+                    <span class="label">Dropoff</span>
+                    <span>{{dropoff_address}}</span>
+                </div>
+                {{/if}}
+                {{#if depart_datetime}}
+                <div class="info-row">
+                    <span class="label">Tanggal Keberangkatan</span>
+                    <span>{{depart_datetime}}</span>
+                </div>
+                {{/if}}
+                {{#if return_datetime}}
+                <div class="info-row">
+                    <span class="label">Tanggal Kepulangan</span>
+                    <span>{{return_datetime}}</span>
+                </div>
+                {{/if}}
             {{/if}}
-            
-            {{#if pickup_address}}
-            <div class="info-row">
-                <span class="label">Pickup</span>
-                <span>{{pickup_address}}</span>
-            </div>
+
+            <!-- ===== FASTBOAT ===== -->
+            {{#if (eq service_type "fastboat")}}
+                {{#if fb_pickup_port}}
+                <div class="info-row">
+                    <span class="label">Pelabuhan Asal</span>
+                    <span>{{fb_pickup_port}}</span>
+                </div>
+                {{/if}}
+                {{#if fb_dropoff_port}}
+                <div class="info-row">
+                    <span class="label">Pelabuhan Tujuan</span>
+                    <span>{{fb_dropoff_port}}</span>
+                </div>
+                {{/if}}
+                {{#if fb_depart_date}}
+                <div class="info-row">
+                    <span class="label">Tanggal Berangkat</span>
+                    <span>{{fb_depart_date}}{{#if fb_depart_slot}} ({{fb_depart_slot}}){{/if}}</span>
+                </div>
+                {{/if}}
+                {{#if fb_return_date}}
+                <div class="info-row">
+                    <span class="label">Tanggal Kembali</span>
+                    <span>{{fb_return_date}}{{#if fb_return_slot}} ({{fb_return_slot}}){{/if}}</span>
+                </div>
+                {{/if}}
             {{/if}}
-            {{#if dropoff_address}}
-            <div class="info-row">
-                <span class="label">Dropoff</span>
-                <span>{{dropoff_address}}</span>
-            </div>
+
+            <!-- ===== TICKET BOAT ===== -->
+            {{#if (eq service_type "ticketboat")}}
+                {{#if tb_pickup_location}}
+                <div class="info-row">
+                    <span class="label">Pelabuhan Asal</span>
+                    <span>{{tb_pickup_location}}</span>
+                </div>
+                {{/if}}
+                {{#if tb_dropoff_location}}
+                <div class="info-row">
+                    <span class="label">Pelabuhan Tujuan</span>
+                    <span>{{tb_dropoff_location}}</span>
+                </div>
+                {{/if}}
+                {{#if tb_ticket_type}}
+                <div class="info-row">
+                    <span class="label">Jenis Tiket</span>
+                    <span>{{tb_ticket_type}}</span>
+                </div>
+                {{/if}}
+                {{#if tb_depart_date}}
+                <div class="info-row">
+                    <span class="label">Tanggal Berangkat</span>
+                    <span>{{tb_depart_date}}{{#if tb_depart_time}} ({{tb_depart_time}}){{/if}}</span>
+                </div>
+                {{/if}}
+                {{#if tb_return_date}}
+                <div class="info-row">
+                    <span class="label">Tanggal Kembali</span>
+                    <span>{{tb_return_date}}{{#if tb_return_time}} ({{tb_return_time}}){{/if}}</span>
+                </div>
+                {{/if}}
             {{/if}}
-            
-            {{#if tb_pickup_location}}
-            <div class="info-row">
-                <span class="label">Pelabuhan Asal</span>
-                <span>{{tb_pickup_location}}</span>
-            </div>
-            {{/if}}
-            {{#if tb_dropoff_location}}
-            <div class="info-row">
-                <span class="label">Pelabuhan Tujuan</span>
-                <span>{{tb_dropoff_location}}</span>
-            </div>
-            {{/if}}
-            
-            {{#if tb_ticket_type}}
-            <div class="info-row">
-                <span class="label">Jenis Tiket</span>
-                <span>{{tb_ticket_type}}</span>
-            </div>
-            {{/if}}
-            
+
             <div class="info-row">
                 <span class="label">Penumpang</span>
                 <span>{{total_pax}} orang</span>
