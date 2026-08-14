@@ -3782,10 +3782,14 @@ app.post('/api/admin/transfer-prices', authenticateAdmin, [
 });
 
 // ============ GET ALL TRANSFER PRICES (ADMIN ONLY) ============
+// ============ GET ALL TRANSFER PRICES (ADMIN ONLY) ============
 app.get('/api/admin/transfer-prices', authenticateAdmin, async (req, res) => {
     const { is_active, limit = 50, offset = 0 } = req.query;
 
     try {
+        console.log('📡 Fetching transfer prices...');
+        console.log('📡 User:', req.user);
+        
         const limitInt = parseInt(limit) || 50;
         const offsetInt = parseInt(offset) || 0;
 
@@ -3797,10 +3801,14 @@ app.get('/api/admin/transfer-prices', authenticateAdmin, async (req, res) => {
             params.push(is_active === 'true' ? 1 : 0);
         }
 
-        query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-        params.push(limitInt, offsetInt);
+        // 🔥 FIX: Gunakan template literal untuk LIMIT/OFFSET
+        query += ` ORDER BY created_at DESC LIMIT ${limitInt} OFFSET ${offsetInt}`;
+
+        console.log('📡 SQL:', query);
+        console.log('📡 Params:', params);
 
         const [prices] = await pool.execute(query, params);
+        console.log('✅ Prices found:', prices.length);
 
         const [countResult] = await pool.execute(
             'SELECT COUNT(*) as total FROM transfer_prices'
@@ -3822,8 +3830,12 @@ app.get('/api/admin/transfer-prices', authenticateAdmin, async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Get transfer prices error:', error);
-        res.status(500).json({ error: 'Internal server error', message: error.message });
+        console.error('❌ Get transfer prices error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Internal server error', 
+            message: error.message 
+        });
     }
 });
 
