@@ -50,7 +50,7 @@ function serviceLabel(serviceType) {
     const map = {
         transfer: 'Transfer',
         fastboat: 'Fastboat',
-        ticketboat: 'Ticket Boat'
+        ticketboat: 'Traditional Boat'
     };
     return map[serviceType] || serviceType || '-';
 }
@@ -103,8 +103,10 @@ function loadInvoiceHtml(bookingData) {
         fb_dropoff_port: serviceType === 'fastboat' ? (bookingData.fb_dropoff_port || null) : null,
         fb_depart_date: serviceType === 'fastboat' ? (bookingData.fb_depart_date || null) : null,
         fb_depart_slot: serviceType === 'fastboat' ? (bookingData.fb_depart_slot || null) : null,
+        fb_depart_time: serviceType === 'fastboat' ? (bookingData.fb_depart_time || null) : null,
         fb_return_date: serviceType === 'fastboat' ? (bookingData.fb_return_date || null) : null,
         fb_return_slot: serviceType === 'fastboat' ? (bookingData.fb_return_slot || null) : null,
+        fb_return_time: serviceType === 'fastboat' ? (bookingData.fb_return_time || null) : null,
         fb_nationality: serviceType === 'fastboat' ? (bookingData.fb_nationality || null) : null,
         fb_adult_count: bookingData.fb_adult_count || 0,
         fb_child_count: bookingData.fb_child_count || 0,
@@ -133,7 +135,9 @@ function loadInvoiceHtml(bookingData) {
         total_pax: getTotalPax(bookingData),
 
         // Rincian biaya
-        base_price: formatRupiah(bookingData.base_price || 0),
+        // "Harga Dasar" hanya berlaku untuk transfer; fastboat & ticketboat
+        // punya rincian harga sendiri (atau tidak ditampilkan sama sekali).
+        base_price: serviceType === 'transfer' ? formatRupiah(bookingData.base_price || 0) : null,
         distance_cost: (serviceType === 'transfer' && bookingData.distance_cost)
             ? formatRupiah(bookingData.distance_cost) : null,
         discount_amount: bookingData.discount_amount

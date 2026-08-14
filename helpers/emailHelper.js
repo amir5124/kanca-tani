@@ -88,7 +88,7 @@ function getServiceLabel(serviceType) {
     const map = {
         'transfer': 'Transfer',
         'fastboat': 'Fastboat',
-        'ticketboat': 'Ticket Boat'
+        'ticketboat': 'Traditional Boat'
     };
     return map[serviceType] || serviceType || '-';
 }

@@ -312,6 +312,12 @@
                         <span class="value">{{fb_depart_slot}}</span>
                     </div>
                     {{/if}}
+                    {{#if fb_depart_time}}
+                    <div class="info-item">
+                        <span class="label">Jam Berangkat</span>
+                        <span class="value">{{fb_depart_time}}</span>
+                    </div>
+                    {{/if}}
                     {{#if fb_return_date}}
                     <div class="info-item">
                         <span class="label">Tanggal Kembali</span>
@@ -321,6 +327,12 @@
                     <div class="info-item">
                         <span class="label">Slot Kembali</span>
                         <span class="value">{{fb_return_slot}}</span>
+                    </div>
+                    {{/if}}
+                    {{#if fb_return_time}}
+                    <div class="info-item">
+                        <span class="label">Jam Kembali</span>
+                        <span class="value">{{fb_return_time}}</span>
                     </div>
                     {{/if}}
                     {{/if}}
@@ -420,10 +432,12 @@
                 </tr>
             </thead>
             <tbody>
+                {{#if base_price}}
                 <tr>
                     <td>Harga Dasar</td>
                     <td class="right">{{base_price}}</td>
                 </tr>
+                {{/if}}
                 
                 {{#if distance_cost}}
                 <tr>
