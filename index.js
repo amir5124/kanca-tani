@@ -1340,22 +1340,23 @@ app.patch('/api/admin/bookings/:id/status', authenticateAdmin, [
                 // ============ 🔥 KIRIM EMAIL INSTRUKSI PEMBAYARAN KETIKA CONFIRMED ============
                 if (bookingData.customer_email) {
                     try {
-                        // Format tanggal untuk email
-                        let departDateFormatted = bookingData.depart_datetime;
-                        if (bookingData.tb_depart_date && bookingData.tb_depart_time) {
-                            departDateFormatted = `${bookingData.tb_depart_date} ${bookingData.tb_depart_time}`;
-                        }
-
+                        // FIX: sebarkan SELURUH bookingData (hasil `SELECT b.*`) supaya
+                        // semua field fb_* dan tb_* (fb_pickup_port, fb_adult_count,
+                        // tb_pickup_location, tb_total_pax, dst.) ikut terkirim ke
+                        // emailHelper. Sebelumnya di sini hanya sebagian field yang
+                        // dipilih manual (booking_reference, total_price, pickup_address,
+                        // dst) sehingga untuk booking fastboat/ticketboat semua field
+                        // fb_*/tb_* jadi undefined -> email tampil kosong dan jumlah
+                        // penumpang selalu 0 (karena getTotalPax() bergantung pada
+                        // fb_adult_count/tb_total_pax yang tidak pernah dikirim).
+                        //
+                        // emailHelper.js sendiri sudah menangani mana field yang relevan
+                        // per service_type (buildTripFields), jadi di sini cukup kirim
+                        // datanya apa adanya.
                         await sendPaymentInstruction(bookingData.customer_email, {
-                            booking_reference: bookingData.booking_reference,
+                            ...bookingData,
                             customer_name: bookingData.customer_name || 'Customer',
-                            total_price: bookingData.total_price,
-                            final_price: bookingData.final_price,
                             discount_amount: bookingData.discount_amount || 0,
-                            service_type: bookingData.service_type,
-                            depart_datetime: departDateFormatted,
-                            pickup_address: bookingData.pickup_address,
-                            dropoff_address: bookingData.dropoff_address,
                             payment_deadline: '24 jam setelah konfirmasi'
                         });
                         paymentEmailSent = true;
