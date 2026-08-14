@@ -66,7 +66,7 @@ function getTotalPax(bookingData) {
 }
 
 function loadInvoiceHtml(bookingData) {
-    const templatePath = path.join(__dirname, '../templates/invoice-template.hbs');
+    const templatePath = path.join(__dirname, '../templates/invoice.hbs');
     const source = fs.readFileSync(templatePath, 'utf8');
     const template = handlebars.compile(source);
 
