@@ -557,7 +557,9 @@ app.post('/api/bookings', [
     body('service_type').isIn(['transfer', 'fastboat', 'ticketboat']).withMessage('Invalid service type'),
     body('trip_type').isIn(['oneway', 'return']).withMessage('Invalid trip type'),
     body('depart_datetime').notEmpty().withMessage('Departure datetime required'),
-    body('referral_code').optional().isString().withMessage('Invalid referral code')
+    body('referral_code').optional().isString().withMessage('Invalid referral code'),
+    // 🔥 BARU: validasi bahasa. Opsional -- kalau tidak dikirim, default 'id' di bawah.
+    body('language').optional().isIn(['id', 'en']).withMessage('Invalid language')
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -603,12 +605,18 @@ app.post('/api/bookings', [
             distance_km,
             duration_minutes,
             notes,
-            referral_code
+            referral_code,
+            language // 🔥 BARU: 'id' atau 'en', dikirim dari widget
         } = req.body;
+
+        // 🔥 BARU: normalisasi -- kalau tidak dikirim atau nilainya bukan 'en',
+        // jatuh ke default 'id' (konsisten dengan DEFAULT 'id' di kolom DB).
+        const bookingLanguage = language === 'en' ? 'en' : 'id';
 
         // ============ 🔥 LOGGING ============
         console.log('📦 ====== BOOKING REQUEST ======');
         console.log('📦 service_type:', service_type);
+        console.log('📦 language:', bookingLanguage);
         console.log('📦 customer.whatsapp:', customer?.whatsapp);
         console.log('📦 ================================');
 
@@ -800,6 +808,7 @@ app.post('/api/bookings', [
         }
 
         // ============ 🔥 INSERT BOOKING ============
+        // 🔥 BARU: kolom `language` ditambahkan di akhir daftar kolom & placeholder.
         const [bookingResult] = await connection.execute(
             `INSERT INTO bookings (
                 booking_reference, customer_id, service_type, trip_type,
@@ -814,7 +823,8 @@ app.post('/api/bookings', [
                 tb_price_per_adult, tb_price_per_child, tb_port_fee, tb_total_pax,
                 depart_datetime, return_datetime,
                 base_price, distance_cost, total_price, discount_percent, discount_amount,
-                final_price, referral_code_used, admin_id, admin_commission, notes
+                final_price, referral_code_used, admin_id, admin_commission, notes,
+                language
             ) VALUES (
                 ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
@@ -828,7 +838,8 @@ app.post('/api/bookings', [
                 ?, ?, ?, ?,
                 ?, ?,
                 ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?,
+                ?
             )`,
             [
                 bookingRef, customerId, service_type, trip_type,
@@ -849,7 +860,8 @@ app.post('/api/bookings', [
                 basePrice, distanceCost || 0, totalPrice,
                 discountApplied, discountAmount,
                 finalPrice, referralCodeUsed, adminId, commissionAmount,
-                notes || null
+                notes || null,
+                bookingLanguage // 🔥 BARU
             ]
         );
         const bookingId = bookingResult.insertId;
@@ -914,6 +926,7 @@ app.post('/api/bookings', [
                 customer_id: customerId,
                 booking_id: bookingId,
                 service_type: service_type,
+                language: bookingLanguage, // 🔥 BARU: dikembalikan juga di response, opsional
                 total_price: totalPrice,
                 discount_applied: discountApplied,
                 discount_amount: discountAmount,
