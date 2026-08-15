@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Instruksi Pembayaran</title>
+    <title>Payment Instruction</title>
     <style>
         body { 
             font-family: Arial, sans-serif; 
@@ -76,21 +76,21 @@
 <body>
     <div class="header">
         <div class="logo">🚀 Gobali Traveling</div>
-        <p>💳 Instruksi Pembayaran</p>
+        <p>💳 Payment Instruction</p>
     </div>
     
     <div class="content">
-        <p>Halo <strong>{{customer_name}}</strong>,</p>
-        <p>Terima kasih telah melakukan pemesanan di Gobali Traveling. Berikut adalah detail pemesanan Anda.</p>
+        <p>Hello <strong>{{customer_name}}</strong>,</p>
+        <p>Thank you for booking with Gobali Traveling. Here are the details of your booking.</p>
         
         <div class="booking-info">
-            <h3>📋 Detail Pemesanan</h3>
+            <h3>📋 Booking Details</h3>
             <div class="info-row">
-                <span class="label">Kode Booking</span>
+                <span class="label">Booking Code</span>
                 <span><strong>{{booking_reference}}</strong></span>
             </div>
             <div class="info-row">
-                <span class="label">Layanan</span>
+                <span class="label">Service</span>
                 <span>
                     <span class="badge badge-{{service_type}}">
                         {{#if (eq service_type "ticketboat")}}🚢{{/if}}
@@ -102,7 +102,7 @@
             </div>
             <div class="info-row">
                 <span class="label">Status</span>
-                <span><span class="badge badge-pending">Menunggu Pembayaran</span></span>
+                <span><span class="badge badge-pending">Awaiting Payment</span></span>
             </div>
 
             <!-- ===== TRANSFER ===== -->
@@ -121,13 +121,13 @@
                 {{/if}}
                 {{#if depart_datetime}}
                 <div class="info-row">
-                    <span class="label">Tanggal Keberangkatan</span>
+                    <span class="label">Departure Date</span>
                     <span>{{depart_datetime}}</span>
                 </div>
                 {{/if}}
                 {{#if return_datetime}}
                 <div class="info-row">
-                    <span class="label">Tanggal Kepulangan</span>
+                    <span class="label">Return Date</span>
                     <span>{{return_datetime}}</span>
                 </div>
                 {{/if}}
@@ -137,25 +137,25 @@
             {{#if (eq service_type "fastboat")}}
                 {{#if fb_pickup_port}}
                 <div class="info-row">
-                    <span class="label">Pelabuhan Asal</span>
+                    <span class="label">Origin Port</span>
                     <span>{{fb_pickup_port}}</span>
                 </div>
                 {{/if}}
                 {{#if fb_dropoff_port}}
                 <div class="info-row">
-                    <span class="label">Pelabuhan Tujuan</span>
+                    <span class="label">Destination Port</span>
                     <span>{{fb_dropoff_port}}</span>
                 </div>
                 {{/if}}
                 {{#if fb_depart_date}}
                 <div class="info-row">
-                    <span class="label">Tanggal Berangkat</span>
+                    <span class="label">Departure Date</span>
                     <span>{{fb_depart_date}}{{#if fb_depart_slot}} ({{fb_depart_slot}}){{/if}}</span>
                 </div>
                 {{/if}}
                 {{#if fb_return_date}}
                 <div class="info-row">
-                    <span class="label">Tanggal Kembali</span>
+                    <span class="label">Return Date</span>
                     <span>{{fb_return_date}}{{#if fb_return_slot}} ({{fb_return_slot}}){{/if}}</span>
                 </div>
                 {{/if}}
@@ -165,82 +165,82 @@
             {{#if (eq service_type "ticketboat")}}
                 {{#if tb_pickup_location}}
                 <div class="info-row">
-                    <span class="label">Pelabuhan Asal</span>
+                    <span class="label">Origin Port</span>
                     <span>{{tb_pickup_location}}</span>
                 </div>
                 {{/if}}
                 {{#if tb_dropoff_location}}
                 <div class="info-row">
-                    <span class="label">Pelabuhan Tujuan</span>
+                    <span class="label">Destination Port</span>
                     <span>{{tb_dropoff_location}}</span>
                 </div>
                 {{/if}}
                 {{#if tb_ticket_type}}
                 <div class="info-row">
-                    <span class="label">Jenis Tiket</span>
+                    <span class="label">Ticket Type</span>
                     <span>{{tb_ticket_type}}</span>
                 </div>
                 {{/if}}
                 {{#if tb_depart_date}}
                 <div class="info-row">
-                    <span class="label">Tanggal Berangkat</span>
+                    <span class="label">Departure Date</span>
                     <span>{{tb_depart_date}}{{#if tb_depart_time}} ({{tb_depart_time}}){{/if}}</span>
                 </div>
                 {{/if}}
                 {{#if tb_return_date}}
                 <div class="info-row">
-                    <span class="label">Tanggal Kembali</span>
+                    <span class="label">Return Date</span>
                     <span>{{tb_return_date}}{{#if tb_return_time}} ({{tb_return_time}}){{/if}}</span>
                 </div>
                 {{/if}}
             {{/if}}
 
             <div class="info-row">
-                <span class="label">Penumpang</span>
-                <span>{{total_pax}} orang</span>
+                <span class="label">Passengers</span>
+                <span>{{total_pax}} people</span>
             </div>
         </div>
         
         <div class="payment-info">
-            <h3>💰 Informasi Pembayaran</h3>
+            <h3>💰 Payment Information</h3>
             <p style="color: #e67e22; font-weight: bold; margin-bottom: 12px;">
-                ⚡ Pembayaran dilakukan secara LANGSUNG di tempat (onsite payment)
+                ⚡ Payment is made ONSITE (onsite payment)
             </p>
             <div class="info-row">
-                <span class="label">Total Pembayaran</span>
+                <span class="label">Total Payment</span>
                 <span class="total">{{final_price}}</span>
             </div>
             {{#if discount_amount}}
             <div class="info-row">
-                <span class="label">Diskon</span>
+                <span class="label">Discount</span>
                 <span style="color: #27ae60;">- {{discount_amount}}</span>
             </div>
             {{/if}}
             <div class="info-row">
-                <span class="label">Metode Pembayaran</span>
-                <span>💰 Tunai / QRIS</span>
+                <span class="label">Payment Method</span>
+                <span>💰 Cash / QRIS</span>
             </div>
             <div class="info-row">
-                <span class="label">Lokasi Pembayaran</span>
-                <span>📍 Di tempat tujuan / lokasi pickup</span>
+                <span class="label">Payment Location</span>
+                <span>📍 At the destination / pickup location</span>
             </div>
         </div>
         
         <div style="background: #fff8e1; padding: 15px; border-radius: 8px; border-left: 4px solid #f39c12; margin: 15px 0;">
             <p style="margin: 0; font-size: 14px;">
-                <strong>📌 Informasi Penting:</strong><br>
-                1. Pembayaran dilakukan <strong>langsung di tempat</strong> kepada driver / crew kami<br>
-                2. Tim kami akan menghubungi Anda melalui WhatsApp atau Email untuk konfirmasi<br>
-                3. Siapkan uang pas untuk mempercepat proses transaksi<br>
-                4. Simpan bukti pembayaran sebagai referensi
+                <strong>📌 Important Information:</strong><br>
+                1. Payment is made <strong>directly onsite</strong> to our driver / crew<br>
+                2. Our team will contact you via WhatsApp or Email for confirmation<br>
+                3. Please prepare the exact amount to speed up the transaction<br>
+                4. Keep your proof of payment for reference
             </p>
         </div>
         
         <div class="important">
-            ⚠️ <strong>Perhatian:</strong> Jika terjadi perubahan jadwal atau pembatalan, harap segera konfirmasi melalui WhatsApp di <strong>{{app_phone}}</strong>.
+            ⚠️ <strong>Attention:</strong> If there is a schedule change or cancellation, please confirm immediately via WhatsApp at <strong>{{app_phone}}</strong>.
         </div>
         
-        <p>Jika Anda memiliki pertanyaan, jangan ragu untuk menghubungi kami.</p>
+        <p>If you have any questions, please don't hesitate to contact us.</p>
     </div>
     
     <div class="footer">

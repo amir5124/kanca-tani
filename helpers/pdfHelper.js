@@ -36,22 +36,50 @@ function formatRupiah(amount) {
     }).format(amount);
 }
 
-function statusBadge(status) {
-    const map = {
+// ============================================================
+// LANGUAGE HELPERS
+// ============================================================
+function resolveLang(bookingData) {
+    return bookingData && bookingData.language === 'en' ? 'en' : 'id';
+}
+
+// 'invoice.hbs' -> 'invoice-en.hbs' kalau lang === 'en'
+function localizedTemplateName(baseName, lang) {
+    if (lang !== 'en') return baseName;
+    const ext = path.extname(baseName);
+    const nameNoExt = baseName.slice(0, -ext.length);
+    return `${nameNoExt}-en${ext}`;
+}
+
+function statusBadge(status, lang) {
+    const mapId = {
         pending: '<span class="badge badge-warning">Pending</span>',
         confirmed: '<span class="badge badge-info">Dikonfirmasi</span>',
         completed: '<span class="badge badge-success">Selesai</span>',
         cancelled: '<span class="badge badge-danger">Dibatalkan</span>'
     };
+    const mapEn = {
+        pending: '<span class="badge badge-warning">Pending</span>',
+        confirmed: '<span class="badge badge-info">Confirmed</span>',
+        completed: '<span class="badge badge-success">Completed</span>',
+        cancelled: '<span class="badge badge-danger">Cancelled</span>'
+    };
+    const map = lang === 'en' ? mapEn : mapId;
     return map[status] || '<span class="badge badge-info">-</span>';
 }
 
-function serviceLabel(serviceType) {
-    const map = {
+function serviceLabel(serviceType, lang) {
+    const mapId = {
+        transfer: 'Transfer',
+        fastboat: 'Fastboat',
+        ticketboat: 'Kapal Tradisional'
+    };
+    const mapEn = {
         transfer: 'Transfer',
         fastboat: 'Fastboat',
         ticketboat: 'Traditional Boat'
     };
+    const map = lang === 'en' ? mapEn : mapId;
     return map[serviceType] || serviceType || '-';
 }
 
@@ -66,7 +94,9 @@ function getTotalPax(bookingData) {
 }
 
 function loadInvoiceHtml(bookingData) {
-    const templatePath = path.join(__dirname, '../templates/invoice.hbs');
+    const lang = resolveLang(bookingData);
+    const templateFile = localizedTemplateName('invoice.hbs', lang);
+    const templatePath = path.join(__dirname, '../templates', templateFile);
     const source = fs.readFileSync(templatePath, 'utf8');
     const template = handlebars.compile(source);
 
@@ -76,13 +106,18 @@ function loadInvoiceHtml(bookingData) {
         // Identitas booking
         booking_reference: bookingData.booking_reference,
         status: bookingData.status || 'completed',
-        status_badge: statusBadge(bookingData.status || 'completed'),
-        completed_at: new Date().toLocaleString('id-ID', {
-            day: '2-digit', month: 'long', year: 'numeric',
-            hour: '2-digit', minute: '2-digit'
-        }),
+        status_badge: statusBadge(bookingData.status || 'completed', lang),
+        completed_at: lang === 'en'
+            ? new Date().toLocaleString('en-US', {
+                day: '2-digit', month: 'long', year: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            })
+            : new Date().toLocaleString('id-ID', {
+                day: '2-digit', month: 'long', year: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            }),
         service_type: serviceType,
-        service_label: serviceLabel(serviceType),
+        service_label: serviceLabel(serviceType, lang),
         trip_type: bookingData.trip_type || null,
         depart_datetime: bookingData.depart_datetime || null,
         return_datetime: bookingData.trip_type === 'return' ? (bookingData.return_datetime || null) : null,
@@ -135,8 +170,6 @@ function loadInvoiceHtml(bookingData) {
         total_pax: getTotalPax(bookingData),
 
         // Rincian biaya
-        // "Harga Dasar" hanya berlaku untuk transfer; fastboat & ticketboat
-        // punya rincian harga sendiri (atau tidak ditampilkan sama sekali).
         base_price: serviceType === 'transfer' ? formatRupiah(bookingData.base_price || 0) : null,
         distance_cost: (serviceType === 'transfer' && bookingData.distance_cost)
             ? formatRupiah(bookingData.distance_cost) : null,
