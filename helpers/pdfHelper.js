@@ -43,7 +43,6 @@ function resolveLang(bookingData) {
     return bookingData && bookingData.language === 'en' ? 'en' : 'id';
 }
 
-// 'invoice.hbs' -> 'invoice-en.hbs' kalau lang === 'en'
 function localizedTemplateName(baseName, lang) {
     if (lang !== 'en') return baseName;
     const ext = path.extname(baseName);
@@ -83,6 +82,20 @@ function serviceLabel(serviceType, lang) {
     return map[serviceType] || serviceType || '-';
 }
 
+function getNationalityLabel(nationality, lang) {
+    if (!nationality) return null;
+    const mapId = {
+        'lokal': 'Lokal (Indonesia)',
+        'asing': 'Asing'
+    };
+    const mapEn = {
+        'lokal': 'Local (Indonesia)',
+        'asing': 'Foreign'
+    };
+    const map = lang === 'en' ? mapEn : mapId;
+    return map[nationality] || nationality;
+}
+
 function getTotalPax(bookingData) {
     if (bookingData.service_type === 'ticketboat') {
         return bookingData.tb_total_pax || 0;
@@ -93,6 +106,9 @@ function getTotalPax(bookingData) {
     return 1;
 }
 
+// ============================================================
+// LOAD INVOICE HTML - FIXED
+// ============================================================
 function loadInvoiceHtml(bookingData) {
     const lang = resolveLang(bookingData);
     const templateFile = localizedTemplateName('invoice.hbs', lang);
@@ -101,6 +117,26 @@ function loadInvoiceHtml(bookingData) {
     const template = handlebars.compile(source);
 
     const serviceType = bookingData.service_type;
+    const isFastboat = serviceType === 'fastboat';
+    const isTicketboat = serviceType === 'ticketboat';
+
+    // 🔥 FIX: Ambil data fastboat termasuk nationality dan harga asing
+    const fbAdultCount = bookingData.fb_adult_count || 0;
+    const fbChildCount = bookingData.fb_child_count || 0;
+    const fbNationality = bookingData.fb_nationality || null;
+
+    // 🔥 FIX: Price fields untuk fastboat
+    let fbPricePerAdult = null;
+    let fbPricePerChild = null;
+    let fbPricePerAdultAsing = null;
+    let fbPricePerChildAsing = null;
+
+    if (isFastboat) {
+        fbPricePerAdult = bookingData.fb_price_per_person || null;
+        fbPricePerChild = bookingData.fb_child_price_value || null;
+        fbPricePerAdultAsing = bookingData.fb_price_per_person_asing || null;
+        fbPricePerChildAsing = bookingData.fb_child_price_value_asing || null;
+    }
 
     return template({
         // Identitas booking
@@ -127,44 +163,49 @@ function loadInvoiceHtml(bookingData) {
         customer_phone: bookingData.customer_phone || null,
         customer_email: bookingData.customer_email || null,
 
-        // Transfer -- hanya diisi kalau service_type transfer
+        // Transfer
         pickup_address: serviceType === 'transfer' ? (bookingData.pickup_address || null) : null,
         dropoff_address: serviceType === 'transfer' ? (bookingData.dropoff_address || null) : null,
         distance_km: serviceType === 'transfer' ? (bookingData.distance_km || null) : null,
         duration_minutes: serviceType === 'transfer' ? (bookingData.duration_minutes || null) : null,
 
-        // Fastboat -- hanya diisi kalau service_type fastboat
-        fb_pickup_port: serviceType === 'fastboat' ? (bookingData.fb_pickup_port || null) : null,
-        fb_dropoff_port: serviceType === 'fastboat' ? (bookingData.fb_dropoff_port || null) : null,
-        fb_depart_date: serviceType === 'fastboat' ? (bookingData.fb_depart_date || null) : null,
-        fb_depart_slot: serviceType === 'fastboat' ? (bookingData.fb_depart_slot || null) : null,
-        fb_depart_time: serviceType === 'fastboat' ? (bookingData.fb_depart_time || null) : null,
-        fb_return_date: serviceType === 'fastboat' ? (bookingData.fb_return_date || null) : null,
-        fb_return_slot: serviceType === 'fastboat' ? (bookingData.fb_return_slot || null) : null,
-        fb_return_time: serviceType === 'fastboat' ? (bookingData.fb_return_time || null) : null,
-        fb_nationality: serviceType === 'fastboat' ? (bookingData.fb_nationality || null) : null,
-        fb_adult_count: bookingData.fb_adult_count || 0,
-        fb_child_count: bookingData.fb_child_count || 0,
+        // Fastboat
+        fb_pickup_port: isFastboat ? (bookingData.fb_pickup_port || null) : null,
+        fb_dropoff_port: isFastboat ? (bookingData.fb_dropoff_port || null) : null,
+        fb_depart_date: isFastboat ? (bookingData.fb_depart_date || null) : null,
+        fb_depart_slot: isFastboat ? (bookingData.fb_depart_slot || null) : null,
+        fb_depart_time: isFastboat ? (bookingData.fb_depart_time || null) : null,
+        fb_return_date: isFastboat ? (bookingData.fb_return_date || null) : null,
+        fb_return_slot: isFastboat ? (bookingData.fb_return_slot || null) : null,
+        fb_return_time: isFastboat ? (bookingData.fb_return_time || null) : null,
+        // 🔥 BARU: nationality untuk fastboat
+        fb_nationality: fbNationality,
+        fb_nationality_label: getNationalityLabel(fbNationality, lang),
+        fb_adult_count: fbAdultCount,
+        fb_child_count: fbChildCount,
+        // 🔥 BARU: harga fastboat
+        fb_price_per_adult: fbPricePerAdult,
+        fb_price_per_child: fbPricePerChild,
+        fb_price_per_adult_asing: fbPricePerAdultAsing,
+        fb_price_per_child_asing: fbPricePerChildAsing,
 
-        // Ticket boat -- hanya diisi kalau service_type ticketboat
-        tb_pickup_location: serviceType === 'ticketboat' ? (bookingData.tb_pickup_location || null) : null,
-        tb_dropoff_location: serviceType === 'ticketboat' ? (bookingData.tb_dropoff_location || null) : null,
-        tb_ticket_type: serviceType === 'ticketboat' ? (bookingData.tb_ticket_type || null) : null,
-        tb_depart_date: serviceType === 'ticketboat' ? (bookingData.tb_depart_date || null) : null,
-        tb_depart_time: serviceType === 'ticketboat' ? (bookingData.tb_depart_time || null) : null,
-        tb_return_date: serviceType === 'ticketboat' ? (bookingData.tb_return_date || null) : null,
-        tb_return_time: serviceType === 'ticketboat' ? (bookingData.tb_return_time || null) : null,
+        // Ticket boat
+        tb_pickup_location: isTicketboat ? (bookingData.tb_pickup_location || null) : null,
+        tb_dropoff_location: isTicketboat ? (bookingData.tb_dropoff_location || null) : null,
+        tb_ticket_type: isTicketboat ? (bookingData.tb_ticket_type || null) : null,
+        tb_depart_date: isTicketboat ? (bookingData.tb_depart_date || null) : null,
+        tb_depart_time: isTicketboat ? (bookingData.tb_depart_time || null) : null,
+        tb_return_date: isTicketboat ? (bookingData.tb_return_date || null) : null,
+        tb_return_time: isTicketboat ? (bookingData.tb_return_time || null) : null,
         tb_adult_count: bookingData.tb_adult_count || 0,
         tb_child_count: bookingData.tb_child_count || 0,
         tb_total_pax: bookingData.tb_total_pax || null,
 
-        // PENTING: kirim angka MENTAH (bukan string yang sudah diformat)
-        // supaya helper {{multiply}} di template bisa menghitung dengan benar.
-        // Formatnya dilakukan di template lewat {{formatRupiah ...}}.
-        tb_price_per_adult: serviceType === 'ticketboat' ? (bookingData.tb_price_per_adult || null) : null,
-        tb_price_per_child: (serviceType === 'ticketboat' && bookingData.tb_child_count)
+        // Ticket boat prices
+        tb_price_per_adult: isTicketboat ? (bookingData.tb_price_per_adult || null) : null,
+        tb_price_per_child: (isTicketboat && bookingData.tb_child_count)
             ? (bookingData.tb_price_per_child || null) : null,
-        tb_port_fee: serviceType === 'ticketboat' ? (bookingData.tb_port_fee || null) : null,
+        tb_port_fee: isTicketboat ? (bookingData.tb_port_fee || null) : null,
 
         // Total PAX
         total_pax: getTotalPax(bookingData),
@@ -191,6 +232,9 @@ function loadInvoiceHtml(bookingData) {
     });
 }
 
+// ============================================================
+// GENERATE INVOICE PDF
+// ============================================================
 async function generateInvoicePDF(bookingData) {
     const html = loadInvoiceHtml(bookingData);
 

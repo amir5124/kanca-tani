@@ -713,23 +713,33 @@ app.post('/api/bookings', [
 
         // ============ 🔥 PERHITUNGAN HARGA ============
         if (service_type === 'fastboat') {
-            const pricePerPerson = parseFloat(fb_price_per_person) || 0;
             const adultCount = parseInt(fb_adult_count) || 1;
             const childCount = parseInt(fb_child_count) || 0;
             const totalPaxCount = parseInt(fb_total_pax) || (adultCount + childCount);
+            const isAsingBooking = fb_nationality === 'asing';
 
+            let pricePerPerson = 0;
             childPriceValue = 0;
+
             if (fb_pickup_port && fb_dropoff_port) {
                 const [route] = await connection.execute(
-                    'SELECT child_price FROM fastboat_routes WHERE pickup_port = ? AND dropoff_port = ? AND is_active = 1',
+                    'SELECT base_price, base_price_asing, child_price, child_price_asing FROM fastboat_routes WHERE pickup_port = ? AND dropoff_port = ? AND is_active = 1',
                     [fb_pickup_port, fb_dropoff_port]
                 );
                 if (route.length > 0) {
-                    childPriceValue = parseFloat(route[0].child_price) || pricePerPerson * 0.5;
+                    pricePerPerson = isAsingBooking
+                        ? (parseFloat(route[0].base_price_asing) || parseFloat(route[0].base_price))
+                        : parseFloat(route[0].base_price);
+                    childPriceValue = isAsingBooking
+                        ? (parseFloat(route[0].child_price_asing) || pricePerPerson * 0.5)
+                        : (parseFloat(route[0].child_price) || pricePerPerson * 0.5);
                 } else {
+                    // fallback ke harga yang dikirim client hanya kalau rute tidak ditemukan di DB
+                    pricePerPerson = parseFloat(fb_price_per_person) || 0;
                     childPriceValue = pricePerPerson * 0.5;
                 }
             } else {
+                pricePerPerson = parseFloat(fb_price_per_person) || 0;
                 childPriceValue = pricePerPerson * 0.5;
             }
 
@@ -737,6 +747,9 @@ app.post('/api/bookings', [
             let childTotal = childCount * childPriceValue;
             totalPrice = adultTotal + childTotal;
 
+            // 🔥 FIX: blok berikut sebelumnya hilang/terpotong sehingga
+            // isReturn tidak pernah mengalikan 2x, diskon/final price selalu 0,
+            // dan pricePerAdult/pricePerChild/totalPax tidak pernah tersimpan.
             if (isReturn) {
                 totalPrice *= 2;
             }
@@ -749,7 +762,17 @@ app.post('/api/bookings', [
             pricePerChild = childPriceValue;
             totalPax = totalPaxCount;
 
-            console.log('💰 Fastboat Price:', { totalPrice, finalPrice });
+            console.log('💰 Fastboat Price:', {
+                pricePerPerson,
+                childPriceValue,
+                isAsingBooking,
+                adultCount,
+                childCount,
+                isReturn,
+                totalPrice,
+                discountAmount,
+                finalPrice
+            });
 
         } else if (service_type === 'ticketboat') {
             if (!tb_pickup_location || !tb_dropoff_location || !tb_ticket_type) {
@@ -3031,7 +3054,9 @@ app.post('/api/admin/fastboat/routes', authenticateAdmin, [
     body('pickup_port').notEmpty().withMessage('Pickup port required'),
     body('dropoff_port').notEmpty().withMessage('Dropoff port required'),
     body('base_price').isNumeric().withMessage('Base price must be a number'),
+    body('base_price_asing').optional().isNumeric().withMessage('Base price asing must be a number'),
     body('child_price').optional().isNumeric().withMessage('Child price must be a number'),
+    body('child_price_asing').optional().isNumeric().withMessage('Child price asing must be a number'),
     body('is_active').optional().isBoolean().withMessage('is_active must be boolean')
 ], async (req, res) => {
     const errors = validationResult(req);
@@ -3039,7 +3064,7 @@ app.post('/api/admin/fastboat/routes', authenticateAdmin, [
         return res.status(400).json({ errors: errors.array() });
     }
 
-    const { pickup_port, dropoff_port, base_price, child_price, is_active } = req.body;
+    const { pickup_port, dropoff_port, base_price, base_price_asing, child_price, child_price_asing, is_active } = req.body;
 
     try {
         const [existing] = await pool.execute(
@@ -3052,13 +3077,15 @@ app.post('/api/admin/fastboat/routes', authenticateAdmin, [
 
         const [result] = await pool.execute(
             `INSERT INTO fastboat_routes 
-            (pickup_port, dropoff_port, base_price, child_price, is_active) 
-            VALUES (?, ?, ?, ?, ?)`,
+            (pickup_port, dropoff_port, base_price, base_price_asing, child_price, child_price_asing, is_active) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [
                 pickup_port,
                 dropoff_port,
                 base_price,
+                base_price_asing || base_price,
                 child_price || 0,
+                child_price_asing || (child_price || 0),
                 is_active !== undefined ? (is_active ? 1 : 0) : 1
             ]
         );
@@ -3158,7 +3185,9 @@ app.put('/api/admin/fastboat/routes/:id', authenticateAdmin, [
     body('pickup_port').optional().notEmpty().withMessage('Pickup port cannot be empty'),
     body('dropoff_port').optional().notEmpty().withMessage('Dropoff port cannot be empty'),
     body('base_price').optional().isNumeric().withMessage('Base price must be a number'),
+    body('base_price_asing').optional().isNumeric().withMessage('Base price asing must be a number'),
     body('child_price').optional().isNumeric().withMessage('Child price must be a number'),
+    body('child_price_asing').optional().isNumeric().withMessage('Child price asing must be a number'),
     body('is_active').optional().isBoolean().withMessage('is_active must be boolean')
 ], async (req, res) => {
     const errors = validationResult(req);
@@ -3167,7 +3196,7 @@ app.put('/api/admin/fastboat/routes/:id', authenticateAdmin, [
     }
 
     const { id } = req.params;
-    const { pickup_port, dropoff_port, base_price, child_price, is_active } = req.body;
+    const { pickup_port, dropoff_port, base_price, base_price_asing, child_price, child_price_asing, is_active } = req.body;
 
     try {
         const [existing] = await pool.execute(
@@ -3203,17 +3232,21 @@ app.put('/api/admin/fastboat/routes/:id', authenticateAdmin, [
             updates.push('base_price = ?');
             values.push(base_price);
         }
+        if (base_price_asing !== undefined) {
+            updates.push('base_price_asing = ?');
+            values.push(base_price_asing);
+        }
         if (child_price !== undefined) {
             updates.push('child_price = ?');
             values.push(child_price);
         }
+        if (child_price_asing !== undefined) {
+            updates.push('child_price_asing = ?');
+            values.push(child_price_asing);
+        }
         if (is_active !== undefined) {
             updates.push('is_active = ?');
             values.push(is_active ? 1 : 0);
-        }
-
-        if (updates.length === 0) {
-            return res.status(400).json({ error: 'No fields to update' });
         }
 
         values.push(id);
@@ -3333,29 +3366,28 @@ app.post('/api/admin/fastboat/routes/bulk', authenticateAdmin, [
 
         for (const route of routes) {
             try {
-                const { pickup_port, dropoff_port, base_price, child_price, is_active } = route;
+                const { pickup_port, dropoff_port, base_price, base_price_asing, child_price, child_price_asing, is_active } = route;
 
                 const [existing] = await connection.execute(
                     'SELECT id FROM fastboat_routes WHERE pickup_port = ? AND dropoff_port = ?',
                     [pickup_port, dropoff_port]
                 );
                 if (existing.length > 0) {
-                    errors_list.push({
-                        route: route,
-                        error: 'Route already exists'
-                    });
+                    errors_list.push({ route: route, error: 'Route already exists' });
                     continue;
                 }
 
                 const [result] = await connection.execute(
                     `INSERT INTO fastboat_routes 
-                    (pickup_port, dropoff_port, base_price, child_price, is_active) 
-                    VALUES (?, ?, ?, ?, ?)`,
+            (pickup_port, dropoff_port, base_price, base_price_asing, child_price, child_price_asing, is_active) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
                     [
                         pickup_port,
                         dropoff_port,
                         base_price,
+                        base_price_asing || base_price,
                         child_price || 0,
+                        child_price_asing || (child_price || 0),
                         is_active !== undefined ? (is_active ? 1 : 0) : 1
                     ]
                 );
@@ -3664,7 +3696,7 @@ app.patch('/api/admin/fastboat/schedules/:id/toggle', authenticateAdmin, async (
 app.get('/api/fastboat/routes', async (req, res) => {
     try {
         const [routes] = await pool.execute(
-            `SELECT id, pickup_port, dropoff_port, base_price, child_price FROM fastboat_routes WHERE is_active = 1 ORDER BY pickup_port, dropoff_port`
+            `SELECT id, pickup_port, dropoff_port, base_price, base_price_asing, child_price, child_price_asing FROM fastboat_routes WHERE is_active = 1 ORDER BY pickup_port, dropoff_port`
         );
 
         res.json({
@@ -3725,11 +3757,11 @@ app.get('/api/fastboat/price', [
         return res.status(400).json({ errors: errors.array() });
     }
 
-    const { pickup_port, dropoff_port, adult_count = 1, child_count = 0, is_return = false } = req.query;
+    const { pickup_port, dropoff_port, adult_count = 1, child_count = 0, is_return = false, nationality = 'lokal' } = req.query;
 
     try {
         const [route] = await pool.execute(
-            `SELECT id, base_price, child_price FROM fastboat_routes WHERE pickup_port = ? AND dropoff_port = ? AND is_active = 1`,
+            `SELECT id, base_price, base_price_asing, child_price, child_price_asing FROM fastboat_routes WHERE pickup_port = ? AND dropoff_port = ? AND is_active = 1`,
             [pickup_port, dropoff_port]
         );
 
@@ -3743,9 +3775,15 @@ app.get('/api/fastboat/price', [
         const adultCount = parseInt(adult_count) || 1;
         const childCount = parseInt(child_count) || 0;
         const isReturn = is_return === 'true' || is_return === true;
+        const isAsing = nationality === 'asing';
 
-        const adultPrice = parseFloat(route[0].base_price);
-        const childPrice = parseFloat(route[0].child_price) || 0;
+        const adultPrice = isAsing
+            ? (parseFloat(route[0].base_price_asing) || parseFloat(route[0].base_price))
+            : parseFloat(route[0].base_price);
+        const childPrice = isAsing
+            ? (parseFloat(route[0].child_price_asing) || adultPrice * 0.5)
+            : (parseFloat(route[0].child_price) || 0);
+
         let total = (adultCount * adultPrice) + (childCount * childPrice);
 
         if (isReturn) {
@@ -3760,6 +3798,7 @@ app.get('/api/fastboat/price', [
                 base_price: adultPrice,
                 child_price: childPrice
             },
+            nationality: isAsing ? 'asing' : 'lokal',
             adult_count: adultCount,
             child_count: childCount,
             is_return: isReturn,

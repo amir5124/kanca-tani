@@ -26,18 +26,13 @@ handlebars.registerHelper('year', function() {
 // ============================================================
 // LANGUAGE HELPERS
 // ============================================================
-// Normalisasi nilai bahasa dari DB. Default 'id' kalau kosong/tidak valid.
 function resolveLang(bookingData) {
     return bookingData && bookingData.language === 'en' ? 'en' : 'id';
 }
 
-// Pilih nama file template sesuai bahasa.
-// Konvensi: versi Indonesia = nama asli (tanpa suffix),
-//           versi Inggris   = nama asli + '-en' sebelum ekstensi.
-// Contoh: 'invoice.hbs' -> 'invoice-en.hbs'
 function localizedTemplateName(baseName, lang) {
     if (lang !== 'en') return baseName;
-    const ext = path.extname(baseName); // '.hbs'
+    const ext = path.extname(baseName);
     const nameNoExt = baseName.slice(0, -ext.length);
     return `${nameNoExt}-en${ext}`;
 }
@@ -83,20 +78,16 @@ function formatRupiah(amount) {
     }).format(amount);
 }
 
-// Format tanggal saja, mis. "14 Agustus 2026" / "August 14, 2026".
-// Mengembalikan null jika kosong, supaya {{#if ...}} di template
-// bisa menyembunyikan baris yang tidak relevan.
 function formatDate(dateVal, lang) {
     if (!dateVal) return null;
     const d = new Date(dateVal);
-    if (isNaN(d.getTime())) return dateVal; // biarkan apa adanya kalau bukan tanggal valid
+    if (isNaN(d.getTime())) return dateVal;
     if (lang === 'en') {
         return d.toLocaleDateString('en-US', { day: '2-digit', month: 'long', year: 'numeric' });
     }
     return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
-// Format tanggal + jam, mis. "14 Agustus 2026, 14:30" / "August 14, 2026, 2:30 PM"
 function formatDateTime(dateVal, lang) {
     if (!dateVal) return null;
     const d = new Date(dateVal);
@@ -128,6 +119,20 @@ function getServiceLabel(serviceType, lang) {
     return map[serviceType] || serviceType || '-';
 }
 
+function getNationalityLabel(nationality, lang) {
+    if (!nationality) return null;
+    const mapId = {
+        'lokal': 'Lokal (Indonesia)',
+        'asing': 'Asing'
+    };
+    const mapEn = {
+        'lokal': 'Local (Indonesia)',
+        'asing': 'Foreign'
+    };
+    const map = lang === 'en' ? mapEn : mapId;
+    return map[nationality] || nationality;
+}
+
 function getTotalPax(bookingData) {
     if (bookingData.service_type === 'ticketboat') {
         return bookingData.tb_total_pax || 0;
@@ -139,17 +144,13 @@ function getTotalPax(bookingData) {
 }
 
 function getPaymentDeadlineLabel(bookingData, lang) {
-    // Kalau caller sudah mengirim payment_deadline eksplisit, hormati itu.
     if (bookingData.payment_deadline) return bookingData.payment_deadline;
     return lang === 'en' ? 'Within 24 hours after confirmation' : '24 jam setelah konfirmasi';
 }
 
-/**
- * Bangun field detail perjalanan sesuai service_type.
- * Field yang tidak relevan untuk tipe layanan tsb sengaja diisi `null`
- * (bukan '-') supaya {{#if field}} di template Handlebars menyembunyikannya,
- * bukan malah menampilkan "-".
- */
+// ============================================================
+// BUILD TRIP FIELDS - FIXED
+// ============================================================
 function buildTripFields(bookingData, lang) {
     const type = bookingData.service_type;
 
@@ -169,6 +170,11 @@ function buildTripFields(bookingData, lang) {
         fb_depart_slot: null,
         fb_return_date: null,
         fb_return_slot: null,
+        // 🔥 BARU: tambahkan fb_nationality dan fb_depart_time/fb_return_time
+        fb_nationality: null,
+        fb_nationality_label: null,
+        fb_depart_time: null,
+        fb_return_time: null,
 
         // Ticket boat
         tb_pickup_location: null,
@@ -194,9 +200,15 @@ function buildTripFields(bookingData, lang) {
         fields.fb_dropoff_port = bookingData.fb_dropoff_port || null;
         fields.fb_depart_date = formatDate(bookingData.fb_depart_date, lang);
         fields.fb_depart_slot = bookingData.fb_depart_slot || null;
+        // 🔥 BARU: tambahkan jam keberangkatan & kepulangan
+        fields.fb_depart_time = bookingData.fb_depart_time || null;
+        // 🔥 BARU: tambahkan nationality
+        fields.fb_nationality = bookingData.fb_nationality || null;
+        fields.fb_nationality_label = getNationalityLabel(bookingData.fb_nationality, lang);
         if (bookingData.fb_return_date) {
             fields.fb_return_date = formatDate(bookingData.fb_return_date, lang);
             fields.fb_return_slot = bookingData.fb_return_slot || null;
+            fields.fb_return_time = bookingData.fb_return_time || null;
         }
     } else if (type === 'ticketboat') {
         fields.tb_pickup_location = bookingData.tb_pickup_location || null;
@@ -213,16 +225,21 @@ function buildTripFields(bookingData, lang) {
     return fields;
 }
 
-/**
- * Bangun rincian biaya sesuai service_type. Sama seperti buildTripFields,
- * field yang tidak relevan diisi null agar disembunyikan di template.
- */
+// ============================================================
+// BUILD PRICE FIELDS - FIXED untuk FASTBOAT
+// ============================================================
 function buildPriceFields(bookingData) {
     const type = bookingData.service_type;
 
     const fields = {
         base_price: formatRupiah(bookingData.base_price || 0),
         distance_cost: null,
+        // 🔥 Untuk fastboat: pakai kolom fb_price_per_person, fb_child_price_value
+        fb_price_per_adult: null,
+        fb_price_per_child: null,
+        fb_price_per_adult_asing: null,
+        fb_price_per_child_asing: null,
+        // 🔥 Untuk ticketboat
         tb_price_per_adult: null,
         tb_price_per_child: null,
         tb_port_fee: null,
@@ -233,6 +250,13 @@ function buildPriceFields(bookingData) {
 
     if (type === 'transfer') {
         fields.distance_cost = bookingData.distance_cost ? formatRupiah(bookingData.distance_cost) : null;
+    } else if (type === 'fastboat') {
+        // 🔥 FIX: fastboat pakai fb_price_per_person dan fb_child_price_value
+        fields.fb_price_per_adult = bookingData.fb_price_per_person || null;
+        fields.fb_price_per_child = bookingData.fb_child_price_value || null;
+        // 🔥 Untuk foreign price (kalau ada)
+        fields.fb_price_per_adult_asing = bookingData.fb_price_per_person_asing || null;
+        fields.fb_price_per_child_asing = bookingData.fb_child_price_value_asing || null;
     } else if (type === 'ticketboat') {
         fields.tb_price_per_adult = bookingData.tb_price_per_adult || null;
         fields.tb_price_per_child = bookingData.tb_child_count ? (bookingData.tb_price_per_child || null) : null;
@@ -242,12 +266,9 @@ function buildPriceFields(bookingData) {
     return fields;
 }
 
-/**
- * Kirim email instruksi pembayaran.
- * Template dipilih otomatis sesuai bookingData.language:
- *   'id' -> templates/payment-instruction.hbs
- *   'en' -> templates/payment-instruction-en.hbs
- */
+// ============================================================
+// SEND PAYMENT INSTRUCTION
+// ============================================================
 async function sendPaymentInstruction(email, bookingData) {
     try {
         const lang = resolveLang(bookingData);
@@ -295,20 +316,19 @@ async function sendPaymentInstruction(email, bookingData) {
     }
 }
 
-/**
- * Kirim email dengan PDF invoice.
- * Template badan email dipilih otomatis sesuai bookingData.language:
- *   'id' -> templates/invoice.hbs
- *   'en' -> templates/invoice-en.hbs
- * (Catatan: PDF-nya sendiri dibuat terpisah di pdfHelper.js — pastikan
- * pdfHelper juga sudah disesuaikan agar bahasanya konsisten.)
- */
+// ============================================================
+// SEND INVOICE WITH PDF
+// ============================================================
 async function sendInvoiceWithPDF(email, bookingData, pdfBuffer) {
     try {
         const lang = resolveLang(bookingData);
         const tripFields = buildTripFields(bookingData, lang);
         const priceFields = buildPriceFields(bookingData);
         const templateFile = localizedTemplateName('invoice.hbs', lang);
+
+        // 🔥 FIX: pastikan fb_adult_count dan fb_child_count dikirim
+        const isFastboat = bookingData.service_type === 'fastboat';
+        const isTicketboat = bookingData.service_type === 'ticketboat';
 
         const html = loadTemplate(templateFile, {
             booking_reference: bookingData.booking_reference || '-',
@@ -321,11 +341,17 @@ async function sendInvoiceWithPDF(email, bookingData, pdfBuffer) {
             ...tripFields,
             ...priceFields,
 
-            tb_adult_count: bookingData.tb_adult_count || 0,
-            tb_child_count: bookingData.tb_child_count || 0,
-            tb_total_pax: bookingData.tb_total_pax || 0,
-            fb_adult_count: bookingData.fb_adult_count || 0,
-            fb_child_count: bookingData.fb_child_count || 0,
+            // 🔥 FASTBOAT - pastikan dikirim ke template
+            fb_adult_count: isFastboat ? (bookingData.fb_adult_count || 0) : 0,
+            fb_child_count: isFastboat ? (bookingData.fb_child_count || 0) : 0,
+            fb_nationality: bookingData.fb_nationality || null,
+            fb_nationality_label: getNationalityLabel(bookingData.fb_nationality, lang),
+
+            // Ticketboat
+            tb_adult_count: isTicketboat ? (bookingData.tb_adult_count || 0) : 0,
+            tb_child_count: isTicketboat ? (bookingData.tb_child_count || 0) : 0,
+            tb_total_pax: isTicketboat ? (bookingData.tb_total_pax || 0) : 0,
+
             total_pax: getTotalPax(bookingData),
 
             total_price: formatRupiah(bookingData.total_price || 0),
@@ -372,7 +398,7 @@ async function sendInvoiceWithPDF(email, bookingData, pdfBuffer) {
     }
 }
 
-module.exports = { 
-    sendPaymentInstruction, 
-    sendInvoiceWithPDF 
+module.exports = {
+    sendPaymentInstruction,
+    sendInvoiceWithPDF
 };
